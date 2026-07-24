@@ -5,8 +5,8 @@ Claude Code 用量 statusline＋額度警戒 hook＋配速判定，三件一組�
 [English README → README.md](README.md)
 
 ```
-重構 auth middleware │ Ctx ▓▓▓░░░░░ 34% │ 5h ▓▓▓┃░░░░ 42%·剩2h13m │ 7d ▓▓▓▓▓┃░░ 71%·剩3d2h
-Ctx 34% │ 5h 42%·剩2h13m·時58% │ 7d 71%·剩3d2h·時55%
+重構auth middleware │ 5h ▓▓▓┃░░░░ 42%·2h13m │ 7d ▓▓▓▓▓┃░░ 71%·3d2h │ Ctx ▓▓▓░░░░░ 34%
+重構auth…│5h▓┃░░42%│7d▓▓┃░71%│Ctx34%           ← 同一行在窄終端上的樣子
 ```
 
 做 Claude Code statusline 的工具已經很多——
@@ -75,6 +75,10 @@ node statusline.cjs --demo
 長條模式的 `┃` 記號就是時間進度畫在用量條上：實心條超過記號＝燒得比
 時鐘快。顏色：綠 < 70% ≤ 黃 < 90% ≤ 紅。
 
+整行是**自適應**的：先畫完整版，放不下就分兩階降級（縮短長條和主題→
+只剩百分比）直到塞得進去。終端有回報寬度就自動偵測；偵測不到時預設
+80 欄——終端更窄（例如手機 SSH）就在 config.json 設 `"width"`。
+
 ## 設定
 
 設定檔在 `~/.claude/claude-pacer/config.json`（自己建；範例見
@@ -88,6 +92,7 @@ node statusline.cjs --demo
 | `labels` | `"en"` | — | `"zh"` 顯示 剩／時 標籤 |
 | `topic_chars` | `24` | — | 主題截斷長度 |
 | `bar_width` | `8` | — | 長條寬度（字元） |
+| `width` | `null`（自動） | `--width N` | 自適應版型的終端欄寬；偵測不到時預設 80 |
 
 state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本通用）。
 
@@ -99,6 +104,9 @@ state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本�
    session name，最能代表這個對話在做什麼；
 2. **Transcript summary** — compact 時寫入的摘要；
 3. **第一句 user prompt** — 全新 session 的 fallback。
+
+中日韓文標題會自動刪掉所有空格（沒有空格照樣好讀，窄螢幕上省下的
+欄位很珍貴）。
 
 ## budget-guard
 

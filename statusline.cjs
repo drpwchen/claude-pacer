@@ -29,6 +29,7 @@ const DEFAULTS = {
   labels: 'en',        // 'en' | 'zh'
   topic_chars: 24,
   bar_width: 8,
+  width: null,         // terminal columns; null = auto-detect, fallback 80
 };
 function readJson(f, fb) { try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return fb; } }
 const cfg = Object.assign({}, DEFAULTS, readJson(path.join(DIR, 'config.json'), {}));
@@ -38,6 +39,7 @@ if (hasFlag('--topic')) cfg.topic = true;
 if (hasFlag('--no-topic')) cfg.topic = false;
 if (hasFlag('--context')) cfg.context = true;
 if (hasFlag('--no-context')) cfg.context = false;
+if (argValue('--width')) cfg.width = parseInt(argValue('--width'), 10) || null;
 
 // ---------- rendering helpers ----------
 const RESET = '\x1b[0m', DIM = '\x1b[2m', BOLD = '\x1b[1m';
@@ -54,10 +56,17 @@ function fmtDur(ms) {
   return `${mm}m`;
 }
 
+// Display width of a rendered string: ANSI codes are free, CJK chars count 2.
+function plainWidth(s) {
+  const p = s.replace(/\x1b\[[0-9;]*m/g, '');
+  let w = 0;
+  for (const ch of p) w += /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/.test(ch) ? 2 : 1;
+  return w;
+}
+
 // Usage bar with an optional elapsed-time marker (┃): if the filled part has
 // passed the marker you are burning faster than the clock.
-function bar(pct, timePct) {
-  const w = cfg.bar_width;
+function bar(pct, timePct, w) {
   const filled = Math.max(0, Math.min(w, Math.round(pct / 100 * w)));
   const marker = typeof timePct === 'number'
     ? Math.max(0, Math.min(w - 1, Math.floor(timePct / 100 * w))) : -1;
@@ -70,41 +79,53 @@ function bar(pct, timePct) {
   return out;
 }
 
-function windowPart(label, win, windowMs, now) {
-  if (!win || typeof win.used_percentage !== 'number') return `${DIM}${label} –${RESET}`;
+// level 0 = full, 1 = compact, 2 = minimal (auto-degrades until it fits)
+function windowPart(label, win, windowMs, now, level) {
+  if (!win || typeof win.used_percentage !== 'number') return level > 0 ? `${DIM}${label}–${RESET}` : `${DIM}${label} –${RESET}`;
   const pct = Math.round(win.used_percentage);
   const remainMs = win.resets_at * 1000 - now;
   const timePct = Math.max(0, Math.min(100, Math.round(100 * (1 - remainMs / windowMs))));
   const c = pctColor(pct);
+  const sp = level > 0 ? '' : ' ';
   if (cfg.display === 'bar') {
-    return `${BOLD}${label}${RESET} ${bar(pct, timePct)} ${c}${pct}%${RESET}${DIM}·${fmtDur(remainMs)}${RESET}`;
+    if (level >= 2) return `${BOLD}${label}${RESET}${c}${pct}%${RESET}`;
+    const b = bar(pct, timePct, level > 0 ? 4 : cfg.bar_width);
+    const time = level > 0 ? '' : `${DIM}·${fmtDur(remainMs)}${RESET}`;
+    return `${BOLD}${label}${RESET}${sp}${b}${sp}${c}${pct}%${RESET}${time}`;
   }
   const zh = cfg.labels === 'zh';
+  if (level >= 2) return `${BOLD}${label}${RESET}${c}${pct}%${RESET}`;
+  if (level === 1) return `${BOLD}${label}${RESET}${c}${pct}%${RESET}${DIM}·${fmtDur(remainMs)}${RESET}`;
   const rem = zh ? `剩${fmtDur(remainMs)}` : `${fmtDur(remainMs)} left`;
   const t = zh ? `時${timePct}%` : `t${timePct}%`;
   return `${BOLD}${label}${RESET} ${c}${pct}%${RESET}${DIM}·${rem}·${t}${RESET}`;
 }
 
-function contextPart(cw) {
+function contextPart(cw, level) {
   let pct = cw && typeof cw.used_percentage === 'number' ? cw.used_percentage : null;
   if (pct === null && cw && cw.current_usage && cw.context_window_size) {
     const u = cw.current_usage;
     const used = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
     pct = 100 * used / cw.context_window_size;
   }
-  if (pct === null) return `${DIM}Ctx –${RESET}`;
+  const label = level >= 2 ? 'C' : 'Ctx';
+  if (pct === null) return `${DIM}${label}–${RESET}`;
   pct = Math.round(pct);
-  if (cfg.display === 'bar') return `${BOLD}Ctx${RESET} ${bar(pct, null)} ${pctColor(pct)}${pct}%${RESET}`;
-  return `${BOLD}Ctx${RESET} ${pctColor(pct)}${pct}%${RESET}`;
+  if (cfg.display === 'bar' && level === 0) return `${BOLD}${label}${RESET} ${bar(pct, null, cfg.bar_width)} ${pctColor(pct)}${pct}%${RESET}`;
+  return `${BOLD}${label}${RESET}${level === 0 ? ' ' : ''}${pctColor(pct)}${pct}%${RESET}`;
 }
 
 // ---------- topic ----------
 // Priority: session_name (Claude Code's own AI-generated/renamed title)
 //         > latest summary entry in the transcript (written on compaction)
 //         > first real user prompt (fallback; re-checked every 5 min for upgrades)
-function truncate(text) {
-  const chars = Array.from(text.replace(/\s+/g, ' ').trim());
-  return chars.slice(0, cfg.topic_chars).join('') + (chars.length > cfg.topic_chars ? '…' : '');
+function truncate(text, max) {
+  max = max || cfg.topic_chars;
+  let t = text.replace(/\s+/g, ' ').trim();
+  // CJK titles don't need spaces — drop them all to save width
+  if (/[　-鿿가-힣豈-﫿]/.test(t)) t = t.replace(/ /g, '');
+  const chars = Array.from(t);
+  return chars.slice(0, max).join('') + (chars.length > max ? '…' : '');
 }
 
 function extractFromTranscript(transcriptPath) {
@@ -205,19 +226,27 @@ function persist(rl, model, now) {
 }
 
 // ---------- main ----------
+function buildLine(input, now, topic, level) {
+  const rl = input.rate_limits || {};
+  const parts = [];
+  if (topic) parts.push(`${CYAN}${truncate(topic, level > 0 ? 10 : cfg.topic_chars)}${RESET}`);
+  parts.push(windowPart('5h', rl.five_hour, 5 * 3600 * 1000, now, level));
+  parts.push(windowPart('7d', rl.seven_day, 7 * 24 * 3600 * 1000, now, level));
+  if (cfg.context) parts.push(contextPart(input.context_window, level)); // rightmost
+  return parts.join(level > 0 ? `${DIM}│${RESET}` : ` ${DIM}│${RESET} `);
+}
+
 function render(input, opts) {
   const now = Date.now();
-  const rl = input.rate_limits || {};
-  if (!opts || !opts.demo) persist(rl, input.model, now);
-  const parts = [];
-  if (cfg.topic) {
-    const topic = (opts && opts.demo) ? input.session_name : getTopic(input);
-    if (topic) parts.push(`${CYAN}${truncate(topic)}${RESET}`);
+  if (!opts || !opts.demo) persist(input.rate_limits || {}, input.model, now);
+  const topic = cfg.topic ? ((opts && opts.demo) ? input.session_name : getTopic(input)) : null;
+  const width = (opts && opts.width) || cfg.width || process.stdout.columns
+    || parseInt(process.env.COLUMNS, 10) || 80;
+  let line = buildLine(input, now, topic, 0);
+  for (let level = 1; level <= 2 && plainWidth(line) > width; level++) {
+    line = buildLine(input, now, topic, level);
   }
-  if (cfg.context) parts.push(contextPart(input.context_window));
-  parts.push(windowPart('5h', rl.five_hour, 5 * 3600 * 1000, now));
-  parts.push(windowPart('7d', rl.seven_day, 7 * 24 * 3600 * 1000, now));
-  return parts.join(` ${DIM}│${RESET} `);
+  return line;
 }
 
 function demo() {
@@ -234,14 +263,14 @@ function demo() {
   hot.context_window.used_percentage = 82;
   hot.rate_limits.five_hour.used_percentage = 91;
   hot.rate_limits.five_hour.resets_at = now + 0.7 * 3600;
-  for (const display of ['number', 'bar']) {
+  for (const display of ['bar', 'number']) {
     cfg.display = display;
-    for (const topic of [false, true]) {
-      cfg.topic = topic;
-      console.log(`  ${display}${topic ? ' +topic' : '        '}  ${render(input, { demo: true })}`);
+    for (const [name, width] of [['wide  ', 999], ['medium', 60], ['narrow', 40]]) {
+      console.log(`  ${display} ${name}  ${render(input, { demo: true, width })}`);
     }
   }
-  console.log('  near cap  ' + render(hot, { demo: true }));
+  cfg.display = 'bar';
+  console.log('  near cap     ' + render(hot, { demo: true, width: 999 }));
 }
 
 function main() {

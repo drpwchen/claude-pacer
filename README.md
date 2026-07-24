@@ -5,8 +5,8 @@ A statusline + budget guard + pacing verdict for Claude Code usage limits.
 [繁體中文說明 → README.zh-TW.md](README.zh-TW.md)
 
 ```
-Refactor auth middleware │ Ctx ▓▓▓░░░░░ 34% │ 5h ▓▓▓┃░░░░ 42%·2h13m │ 7d ▓▓▓▓▓┃░░ 71%·3d2h
-Ctx 34% │ 5h 42%·2h13m left·t58% │ 7d 71%·3d2h left·t55%
+Refactor auth middleware │ 5h ▓▓▓┃░░░░ 42%·2h13m │ 7d ▓▓▓▓▓┃░░ 71%·3d2h │ Ctx ▓▓▓░░░░░ 34%
+Refactor a…│5h▓┃░░42%│7d▓▓┃░71%│Ctx34%              ← same line on a narrow terminal
 ```
 
 There are many great Claude Code statuslines out there —
@@ -79,6 +79,13 @@ bar: filled bar past the marker = burning faster than the clock.
 
 Colors: green < 70% ≤ yellow < 90% ≤ red.
 
+The line is **responsive**: it renders full-width first, and if that doesn't
+fit the terminal it degrades in two steps (shorter bars and topic, then
+percentages only) until it does. Width is auto-detected where the terminal
+reports it; when it can't be detected the fallback is 80 columns — set
+`"width"` in config.json if your terminal is narrower (e.g. a phone SSH
+session).
+
 ## Configuration
 
 Settings live in `~/.claude/claude-pacer/config.json` (created by you; see
@@ -92,6 +99,7 @@ Settings live in `~/.claude/claude-pacer/config.json` (created by you; see
 | `labels` | `"en"` | — | `"zh"` renders 剩/時 labels |
 | `topic_chars` | `24` | — | Topic truncation length |
 | `bar_width` | `8` | — | Bar width in characters |
+| `width` | `null` (auto) | `--width N` | Terminal columns for the responsive layout; fallback 80 |
 
 State dir override (all three scripts): `--dir <path>` or `$CLAUDE_PACER_DIR`.
 
@@ -104,6 +112,9 @@ resolved in priority order:
    (`/rename` or automatic), the most accurate description of the session;
 2. **Transcript summary** — the summary Claude Code writes on compaction;
 3. **First user prompt** — fallback for brand-new sessions.
+
+CJK titles get their spaces stripped (they read fine without them and the
+saved columns matter on narrow screens).
 
 ## budget-guard
 
