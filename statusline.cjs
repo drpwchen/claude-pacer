@@ -30,7 +30,8 @@ const DEFAULTS = {
   model: true,         // show model + reasoning effort (rightmost)
   topic_chars: 20,
   bar_width: 6,
-  width: null,         // terminal columns; null = auto-detect, fallback 80
+  width: null,         // terminal columns; null = auto-detect
+  tier: 'auto',        // 'auto' | 'full' | 'compact' | 'minimal' — force a layout
 };
 function readJson(f, fb) { try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return fb; } }
 const cfg = Object.assign({}, DEFAULTS, readJson(path.join(DIR, 'config.json'), {}));
@@ -41,6 +42,7 @@ if (hasFlag('--no-topic')) cfg.topic = false;
 if (hasFlag('--context')) cfg.context = true;
 if (hasFlag('--no-context')) cfg.context = false;
 if (argValue('--width')) cfg.width = parseInt(argValue('--width'), 10) || null;
+if (argValue('--tier')) cfg.tier = argValue('--tier');
 
 // ---------- rendering helpers ----------
 const RESET = '\x1b[0m', DIM = '\x1b[2m', BOLD = '\x1b[1m';
@@ -91,10 +93,11 @@ function windowPart(label, win, windowMs, now, level) {
   const sp = level > 0 ? '' : ' ';
   if (cfg.display === 'bar') {
     if (level >= 2) return `${BOLD}${label}${RESET}${c}${pct}%${RESET}`;
-    // compact bars are too coarse for the time marker — drop it there
-    const b = bar(pct, level > 0 ? null : timePct, level > 0 ? 4 : cfg.bar_width);
-    const time = level > 0 ? '' : `${DIM}·${fmtDur(remainMs)}${RESET}`;
-    return `${BOLD}${label}${RESET}${sp}${b}${sp}${c}${pct}%${RESET}${time}`;
+    // compact: the bar already shows usage — pair it with remaining time,
+    // which the bar can't show (marker dropped: 4 cells too coarse for it)
+    if (level === 1) return `${BOLD}${label}${RESET}${bar(pct, null, 4)}${DIM}${fmtDur(remainMs)}${RESET}`;
+    const b = bar(pct, timePct, cfg.bar_width);
+    return `${BOLD}${label}${RESET} ${b} ${c}${pct}%${RESET}${DIM}·${fmtDur(remainMs)}${RESET}`;
   }
   const zh = cfg.labels === 'zh';
   if (level >= 2) return `${BOLD}${label}${RESET}${c}${pct}%${RESET}`;
@@ -253,13 +256,51 @@ function buildLine(input, now, topic, level) {
   return parts.join(level > 0 ? `${DIM}│${RESET}` : ` ${DIM}│${RESET} `);
 }
 
+// Terminal width. Claude Code ≥2.1.153 sets $COLUMNS for the statusline
+// process (official path). Fallbacks: stdout.columns (if a TTY), then probing
+// the attached console (mode con / stty via /dev/tty), cached 15 s.
+// Unknown width → null → NO degradation (full layout).
+function probeTerminal() {
+  const cacheFile = path.join(DIR, 'width.json');
+  try {
+    const c = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    if (Date.now() - c.ts < 15000) return c.w; // may be null (probe known to fail)
+  } catch {}
+  let w = null;
+  try {
+    const { execSync } = require('child_process');
+    if (process.platform === 'win32') {
+      const out = execSync('mode con', { timeout: 1500, windowsHide: true }).toString();
+      const nums = out.match(/\d+/g); // lines, columns, ... (locale-proof: order is fixed)
+      if (nums && nums.length >= 2) w = parseInt(nums[1], 10) || null;
+    } else {
+      const out = execSync('stty size < /dev/tty', { timeout: 1500, shell: '/bin/sh' }).toString();
+      const m = out.trim().split(/\s+/); // "rows cols"
+      if (m.length === 2) w = parseInt(m[1], 10) || null;
+    }
+  } catch {}
+  try { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify({ w, ts: Date.now() })); } catch {}
+  return w;
+}
+
+function detectWidth() {
+  if (cfg.width) return cfg.width;
+  const env = parseInt(process.env.COLUMNS, 10);
+  if (env > 0) return env;
+  if (process.stdout.columns) return process.stdout.columns;
+  return probeTerminal();
+}
+
+const TIERS = { full: 0, compact: 1, minimal: 2 };
+
 function render(input, opts) {
   const now = Date.now();
   if (!opts || !opts.demo) persist(input.rate_limits || {}, input.model, now);
   const topic = cfg.topic ? ((opts && opts.demo) ? input.session_name : getTopic(input)) : null;
-  const width = (opts && opts.width) || cfg.width || process.stdout.columns
-    || parseInt(process.env.COLUMNS, 10) || 80;
+  if (cfg.tier in TIERS) return buildLine(input, now, topic, TIERS[cfg.tier]);
+  const width = (opts && opts.width) || detectWidth();
   let line = buildLine(input, now, topic, 0);
+  if (!width) return line; // width unknown — stay full rather than guess
   for (let level = 1; level <= 2 && plainWidth(line) > width; level++) {
     line = buildLine(input, now, topic, level);
   }

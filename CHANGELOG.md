@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.2 — 2026-07-24
+
+- Compact tier now pairs the bar with **time remaining** instead of a usage
+  percentage — the bar already shows usage; the time is what it can't show.
+- Real terminal-width detection: `$COLUMNS` (set by Claude Code ≥2.1.153),
+  then `stdout.columns`, then a cached console probe (`mode con` / `stty`).
+  Unknown width now keeps the **full** layout instead of assuming 80 columns.
+- New `"tier"` config / `--tier` flag to pin `full` / `compact` / `minimal`.
+
 ## v0.1.1 — 2026-07-24
 
 - Fix: the elapsed-time marker used to REPLACE a bar cell, which inflated the

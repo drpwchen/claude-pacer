@@ -7,6 +7,7 @@
   "topic_chars": 20,
   "bar_width": 6,
   "width": null,
+  "tier": "auto",
   "guard": {
     "soft_pct": 85,
     "hard_pct": 93,

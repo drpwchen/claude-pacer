@@ -83,11 +83,14 @@ tiers drop the marker — a 4-cell bar is too coarse for it.
 Colors: green < 70% ≤ yellow < 90% ≤ red.
 
 The line is **responsive**: it renders full-width first, and if that doesn't
-fit the terminal it degrades in two steps (shorter bars and topic, then
-percentages only) until it does. Width is auto-detected where the terminal
-reports it; when it can't be detected the fallback is 80 columns — set
-`"width"` in config.json if your terminal is narrower (e.g. a phone SSH
-session).
+fit the terminal it degrades in two steps — compact (4-cell bars paired with
+*time remaining*, since the bar already shows usage), then percentages only.
+Terminal width comes from the `$COLUMNS` env var, which Claude Code sets for
+the statusline process since v2.1.153 (fallbacks: `process.stdout.columns`,
+then probing the attached console — `mode con` on Windows, `stty size
+</dev/tty` elsewhere — cached 15 s). If width can't be determined the line
+stays **full** — it never degrades on a guess. `"width"` in config.json overrides detection, and
+`"tier"` (`"full"` / `"compact"` / `"minimal"`) pins a layout outright.
 
 ## Configuration
 
@@ -103,7 +106,8 @@ Settings live in `~/.claude/claude-pacer/config.json` (created by you; see
 | `model` | `true` | — | Show model + reasoning effort (rightmost) |
 | `topic_chars` | `20` | — | Topic truncation length |
 | `bar_width` | `6` | — | Bar width in characters |
-| `width` | `null` (auto) | `--width N` | Terminal columns for the responsive layout; fallback 80 |
+| `width` | `null` (auto) | `--width N` | Terminal columns for the responsive layout; unknown = stay full |
+| `tier` | `"auto"` | `--tier T` | Pin a layout: `full` / `compact` / `minimal` |
 
 State dir override (all three scripts): `--dir <path>` or `$CLAUDE_PACER_DIR`.
 

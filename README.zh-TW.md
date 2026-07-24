@@ -77,9 +77,13 @@ node statusline.cjs --demo
 所以填充比例永遠準確）：實心條超過記號＝燒得比時鐘快。緊湊版的
 4 格條太粗、放記號會失真，所以不畫。顏色：綠 < 70% ≤ 黃 < 90% ≤ 紅。
 
-整行是**自適應**的：先畫完整版，放不下就分兩階降級（縮短長條和主題→
-只剩百分比）直到塞得進去。終端有回報寬度就自動偵測；偵測不到時預設
-80 欄——終端更窄（例如手機 SSH）就在 config.json 設 `"width"`。
+整行是**自適應**的：先畫完整版，放不下就分兩階降級——緊湊版（4 格
+長條配**剩餘時間**，因為長條本身已表達用量）→ 只剩百分比。終端寬度
+讀 `$COLUMNS` 環境變數（Claude Code v2.1.153 起會設給 statusline；
+fallback：stdout、再探測 console——Windows `mode con`／其他 `stty size`，
+快取 15 秒）。偵測不到寬度就**維持完整版**，絕不用猜的降級。
+config.json 的 `"width"` 可覆蓋偵測，`"tier"`（`full`／`compact`／
+`minimal`）可直接釘死版型。
 
 ## 設定
 
@@ -95,7 +99,8 @@ node statusline.cjs --demo
 | `model` | `true` | — | 顯示 model＋reasoning effort（最右） |
 | `topic_chars` | `20` | — | 主題截斷長度 |
 | `bar_width` | `6` | — | 長條寬度（字元） |
-| `width` | `null`（自動） | `--width N` | 自適應版型的終端欄寬；偵測不到時預設 80 |
+| `width` | `null`（自動） | `--width N` | 自適應版型的終端欄寬；偵測不到＝維持完整版 |
+| `tier` | `"auto"` | `--tier T` | 釘死版型：`full`／`compact`／`minimal` |
 
 state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本通用）。
 
