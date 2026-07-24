@@ -5,8 +5,8 @@ Claude Code 用量 statusline＋額度警戒 hook＋配速判定，三件一組�
 [English README → README.md](README.md)
 
 ```
-重構auth middleware │ 5h ▓▓▓┃░░░░ 42%·2h13m │ 7d ▓▓▓▓▓┃░░ 71%·3d2h │ Ctx ▓▓▓░░░░░ 34%
-重構auth…│5h▓┃░░42%│7d▓▓┃░71%│Ctx34%           ← 同一行在窄終端上的樣子
+重構auth middleware │ 5h ▓▓▓┃░░░ 42%·剩2h13m │ 7d ▓▓▓▓┃▓░ 71%·剩3d2h │ Ctx ▓▓░░░░ 34% │ Fable 5·high
+重構auth…│5h▓▓░░42%│7d▓▓▓░71%│Ctx34%│Fable5·hi      ← 同一行在窄終端上的樣子
 ```
 
 做 Claude Code statusline 的工具已經很多——
@@ -71,9 +71,11 @@ node statusline.cjs --demo
 | `剩2h13m` | 視窗重置倒數 |
 | `時58%` | 視窗「時間」已流逝百分比——用量% > 時間% 表示燒得比時鐘快 |
 | `7d ⋯` | 7 天視窗的同三項 |
+| `Fable 5·high` | 目前的 model 與 reasoning effort |
 
-長條模式的 `┃` 記號就是時間進度畫在用量條上：實心條超過記號＝燒得比
-時鐘快。顏色：綠 < 70% ≤ 黃 < 90% ≤ 紅。
+長條模式的 `┃` 記號是時間進度，**插在格子之間**（不佔用實心格，
+所以填充比例永遠準確）：實心條超過記號＝燒得比時鐘快。緊湊版的
+4 格條太粗、放記號會失真，所以不畫。顏色：綠 < 70% ≤ 黃 < 90% ≤ 紅。
 
 整行是**自適應**的：先畫完整版，放不下就分兩階降級（縮短長條和主題→
 只剩百分比）直到塞得進去。終端有回報寬度就自動偵測；偵測不到時預設
@@ -90,8 +92,9 @@ node statusline.cjs --demo
 | `topic` | `true` | `--topic`／`--no-topic` | 顯示對話主題 |
 | `context` | `true` | `--context`／`--no-context` | 顯示 context 欄 |
 | `labels` | `"en"` | — | `"zh"` 顯示 剩／時 標籤 |
-| `topic_chars` | `24` | — | 主題截斷長度 |
-| `bar_width` | `8` | — | 長條寬度（字元） |
+| `model` | `true` | — | 顯示 model＋reasoning effort（最右） |
+| `topic_chars` | `20` | — | 主題截斷長度 |
+| `bar_width` | `6` | — | 長條寬度（字元） |
 | `width` | `null`（自動） | `--width N` | 自適應版型的終端欄寬；偵測不到時預設 80 |
 
 state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本通用）。

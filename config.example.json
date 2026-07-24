@@ -2,9 +2,11 @@
   "display": "bar",
   "topic": true,
   "context": true,
+  "model": true,
   "labels": "en",
-  "topic_chars": 24,
-  "bar_width": 8,
+  "topic_chars": 20,
+  "bar_width": 6,
+  "width": null,
   "guard": {
     "soft_pct": 85,
     "hard_pct": 93,

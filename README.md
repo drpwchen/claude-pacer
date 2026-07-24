@@ -5,8 +5,8 @@ A statusline + budget guard + pacing verdict for Claude Code usage limits.
 [繁體中文說明 → README.zh-TW.md](README.zh-TW.md)
 
 ```
-Refactor auth middleware │ 5h ▓▓▓┃░░░░ 42%·2h13m │ 7d ▓▓▓▓▓┃░░ 71%·3d2h │ Ctx ▓▓▓░░░░░ 34%
-Refactor a…│5h▓┃░░42%│7d▓▓┃░71%│Ctx34%              ← same line on a narrow terminal
+Refactor auth middleware │ 5h ▓▓▓┃░░░ 42%·2h13m │ 7d ▓▓▓▓┃▓░ 71%·3d2h │ Ctx ▓▓░░░░ 34% │ Fable 5·high
+Refactor a…│5h▓▓░░42%│7d▓▓▓░71%│Ctx34%│Fable5·hi      ← same line on a narrow terminal
 ```
 
 There are many great Claude Code statuslines out there —
@@ -73,9 +73,12 @@ node statusline.cjs --demo
 | `2h13m left` | Time until this window resets |
 | `t58%` | Percent of the window's *time* already elapsed — if usage% > time%, you're burning faster than the clock |
 | `7d …` | Same three readings for the 7-day window |
+| `Fable 5·high` | Current model and reasoning effort |
 
-In bar mode the `┃` marker is the elapsed-time position drawn on the usage
-bar: filled bar past the marker = burning faster than the clock.
+In bar mode the `┃` marker is the elapsed-time position, inserted *between*
+bar cells (it never eats a fill cell, so the filled proportion always reads
+true): filled bar past the marker = burning faster than the clock. Compact
+tiers drop the marker — a 4-cell bar is too coarse for it.
 
 Colors: green < 70% ≤ yellow < 90% ≤ red.
 
@@ -97,8 +100,9 @@ Settings live in `~/.claude/claude-pacer/config.json` (created by you; see
 | `topic` | `true` | `--topic` / `--no-topic` | Show conversation topic |
 | `context` | `true` | `--context` / `--no-context` | Show context-window segment |
 | `labels` | `"en"` | — | `"zh"` renders 剩/時 labels |
-| `topic_chars` | `24` | — | Topic truncation length |
-| `bar_width` | `8` | — | Bar width in characters |
+| `model` | `true` | — | Show model + reasoning effort (rightmost) |
+| `topic_chars` | `20` | — | Topic truncation length |
+| `bar_width` | `6` | — | Bar width in characters |
 | `width` | `null` (auto) | `--width N` | Terminal columns for the responsive layout; fallback 80 |
 
 State dir override (all three scripts): `--dir <path>` or `$CLAUDE_PACER_DIR`.

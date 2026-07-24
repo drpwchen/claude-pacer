@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.1 — 2026-07-24
+
+- Fix: the elapsed-time marker used to REPLACE a bar cell, which inflated the
+  apparent fill on narrow bars (63% could render as a full bar). It is now
+  inserted between cells, and compact tiers drop it entirely.
+- New: model + reasoning-effort segment at the far right of every tier
+  (`Fable 5·high` → `Fable5·hi` → `F5·hi`), `"model"` config to hide.
+- Slimmer full tier: default `bar_width` 8 → 6, `topic_chars` 24 → 20.
+
 ## v0.1.0 — 2026-07-24
 
 Initial public release, extracted from a personal setup that has run in daily

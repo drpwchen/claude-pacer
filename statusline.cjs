@@ -27,8 +27,9 @@ const DEFAULTS = {
   topic: true,         // show conversation topic (session title / summary / first prompt)
   context: true,       // show context-window fullness
   labels: 'en',        // 'en' | 'zh'
-  topic_chars: 24,
-  bar_width: 8,
+  model: true,         // show model + reasoning effort (rightmost)
+  topic_chars: 20,
+  bar_width: 6,
   width: null,         // terminal columns; null = auto-detect, fallback 80
 };
 function readJson(f, fb) { try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return fb; } }
@@ -65,16 +66,17 @@ function plainWidth(s) {
 }
 
 // Usage bar with an optional elapsed-time marker (┃): if the filled part has
-// passed the marker you are burning faster than the clock.
+// passed the marker you are burning faster than the clock. The marker is
+// INSERTED BETWEEN cells (bar becomes w+1 wide) so it never eats a fill cell
+// and the filled proportion always reads true.
 function bar(pct, timePct, w) {
   const filled = Math.max(0, Math.min(w, Math.round(pct / 100 * w)));
   const marker = typeof timePct === 'number'
-    ? Math.max(0, Math.min(w - 1, Math.floor(timePct / 100 * w))) : -1;
+    ? Math.max(0, Math.min(w, Math.round(timePct / 100 * w))) : -1;
   let out = '';
-  for (let i = 0; i < w; i++) {
+  for (let i = 0; i <= w; i++) {
     if (i === marker) out += '┃';                       // normal color, stands out on both zones
-    else if (i < filled) out += `${pctColor(pct)}▓${RESET}`;
-    else out += `${DIM}░${RESET}`;
+    if (i < w) out += i < filled ? `${pctColor(pct)}▓${RESET}` : `${DIM}░${RESET}`;
   }
   return out;
 }
@@ -89,7 +91,8 @@ function windowPart(label, win, windowMs, now, level) {
   const sp = level > 0 ? '' : ' ';
   if (cfg.display === 'bar') {
     if (level >= 2) return `${BOLD}${label}${RESET}${c}${pct}%${RESET}`;
-    const b = bar(pct, timePct, level > 0 ? 4 : cfg.bar_width);
+    // compact bars are too coarse for the time marker — drop it there
+    const b = bar(pct, level > 0 ? null : timePct, level > 0 ? 4 : cfg.bar_width);
     const time = level > 0 ? '' : `${DIM}·${fmtDur(remainMs)}${RESET}`;
     return `${BOLD}${label}${RESET}${sp}${b}${sp}${c}${pct}%${RESET}${time}`;
   }
@@ -113,6 +116,19 @@ function contextPart(cw, level) {
   pct = Math.round(pct);
   if (cfg.display === 'bar' && level === 0) return `${BOLD}${label}${RESET} ${bar(pct, null, cfg.bar_width)} ${pctColor(pct)}${pct}%${RESET}`;
   return `${BOLD}${label}${RESET}${level === 0 ? ' ' : ''}${pctColor(pct)}${pct}%${RESET}`;
+}
+
+const EFFORT_ABBR = { low: 'lo', medium: 'med', high: 'hi', xhigh: 'xhi', max: 'max' };
+function modelPart(input, level) {
+  const name = input.model && (input.model.display_name || input.model.id);
+  if (!name) return null;
+  const eff = input.effort && input.effort.level;
+  if (level >= 2) { // initials: "Fable 5" → F5, "Opus 4.8" → O4.8
+    const short = name.split(/\s+/).map(w => (/^[\d.]/.test(w) ? w : w[0])).join('');
+    return `${DIM}${short}${eff ? '·' + (EFFORT_ABBR[eff] || eff) : ''}${RESET}`;
+  }
+  const n = level === 1 ? name.replace(/ /g, '') : name;
+  return `${DIM}${n}${eff ? '·' + (level === 1 ? (EFFORT_ABBR[eff] || eff) : eff) : ''}${RESET}`;
 }
 
 // ---------- topic ----------
@@ -232,7 +248,8 @@ function buildLine(input, now, topic, level) {
   if (topic) parts.push(`${CYAN}${truncate(topic, level > 0 ? 10 : cfg.topic_chars)}${RESET}`);
   parts.push(windowPart('5h', rl.five_hour, 5 * 3600 * 1000, now, level));
   parts.push(windowPart('7d', rl.seven_day, 7 * 24 * 3600 * 1000, now, level));
-  if (cfg.context) parts.push(contextPart(input.context_window, level)); // rightmost
+  if (cfg.context) parts.push(contextPart(input.context_window, level));
+  if (cfg.model) { const m = modelPart(input, level); if (m) parts.push(m); } // rightmost
   return parts.join(level > 0 ? `${DIM}│${RESET}` : ` ${DIM}│${RESET} `);
 }
 
@@ -253,6 +270,8 @@ function demo() {
   const now = Math.floor(Date.now() / 1000);
   const input = {
     session_name: 'Refactor auth middleware',
+    model: { display_name: 'Fable 5' },
+    effort: { level: 'high' },
     context_window: { used_percentage: 34 },
     rate_limits: {
       five_hour: { used_percentage: 42, resets_at: now + 2.9 * 3600 },
