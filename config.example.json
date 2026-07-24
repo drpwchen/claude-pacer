@@ -1,0 +1,16 @@
+{
+  "display": "number",
+  "topic": false,
+  "context": true,
+  "labels": "en",
+  "topic_chars": 24,
+  "bar_width": 8,
+  "guard": {
+    "soft_pct": 85,
+    "hard_pct": 93,
+    "stale_min": 15,
+    "rearm_min": 10,
+    "pace_interval_min": 15,
+    "resume_hint": null
+  }
+}
