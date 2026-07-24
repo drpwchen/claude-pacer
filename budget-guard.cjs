@@ -26,8 +26,9 @@ const CONFIG_FILE = path.join(DIR, 'config.json');
 const PACE_FILE = path.join(DIR, 'pace.json');
 
 const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pace_interval_min: 15, resume_hint: null };
-// usage_verdict.py ships next to this file
-const VERDICT_CMD = `python "${path.join(__dirname, 'usage_verdict.py')}"`;
+// usage_verdict.py ships next to this file; macOS/Linux usually have no bare `python`
+const PY = process.platform === 'win32' ? 'python' : 'python3';
+const VERDICT_CMD = `${PY} "${path.join(__dirname, 'usage_verdict.py')}"`;
 
 function readJson(f, fallback) {
   try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return fallback; }

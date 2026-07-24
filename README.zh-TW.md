@@ -5,12 +5,17 @@ Claude Code 用量 statusline＋額度警戒 hook＋配速判定，三件一組�
 [English README → README.md](README.md)
 
 ```
+重構 auth middleware │ Ctx ▓▓▓░░░░░ 34% │ 5h ▓▓▓┃░░░░ 42%·剩2h13m │ 7d ▓▓▓▓▓┃░░ 71%·剩3d2h
 Ctx 34% │ 5h 42%·剩2h13m·時58% │ 7d 71%·剩3d2h·時55%
-Ctx ▓▓▓░░░░░ 34% │ 5h ▓▓▓┃░░░░ 42%·剩2h13m │ 7d ▓▓▓▓▓┃░░ 71%·剩3d2h
 ```
 
-做 Claude Code statusline 的工具已經很多（ccusage、CCometixLine、
-cc-statusline、claude-powerline⋯⋯），都很好用，挑你喜歡的就好。這套的
+做 Claude Code statusline 的工具已經很多——
+[ccusage](https://github.com/ccusage/ccusage)、
+[ccstatusline](https://github.com/sirmalloc/ccstatusline)、
+[CCometixLine](https://github.com/Haleclipse/CCometixLine)、
+[cc-statusline](https://github.com/chongdashu/cc-statusline)、
+[claude-powerline](https://github.com/Owloops/claude-powerline)⋯⋯
+都很好用，挑你喜歡的就好。這套的
 差異點在於：statusline 只給「人」看，擋不住半夜自主跑批次的 agent 把額度
 燒光。claude-pacer 是共用同一份資料檔的三層：
 
@@ -24,7 +29,8 @@ cc-statusline、claude-powerline⋯⋯），都很好用，挑你喜歡的就好
 
 ## 安裝
 
-需要 Node.js（statusline＋guard）；usage_verdict 需要 Python 3（選用）。
+Windows／macOS／Linux 都能跑。需要 Node.js（statusline＋guard）；
+usage_verdict 需要 Python 3（選用）。
 
 ```bash
 git clone https://github.com/drpwchen/claude-pacer.git
@@ -76,8 +82,8 @@ node statusline.cjs --demo
 
 | 鍵 | 預設 | 參數 | 意思 |
 |---|---|---|---|
-| `display` | `"number"` | `--bar`／`--number` | 數字或長條 |
-| `topic` | `false` | `--topic`／`--no-topic` | 顯示對話主題 |
+| `display` | `"bar"` | `--bar`／`--number` | 長條或數字 |
+| `topic` | `true` | `--topic`／`--no-topic` | 顯示對話主題 |
 | `context` | `true` | `--context`／`--no-context` | 顯示 context 欄 |
 | `labels` | `"en"` | — | `"zh"` 顯示 剩／時 標籤 |
 | `topic_chars` | `24` | — | 主題截斷長度 |
@@ -87,7 +93,7 @@ state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本�
 
 ### 主題模式
 
-預設關閉。開啟後依優先序解析：
+預設開啟（`"topic": false` 或 `--no-topic` 可關）。依優先序解析：
 
 1. **Session 標題** — Claude Code 自己生成（或 `/rename` 改過）的
    session name，最能代表這個對話在做什麼；
@@ -114,7 +120,7 @@ state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本�
 ## usage_verdict.py
 
 ```
-$ python usage_verdict.py
+$ python3 usage_verdict.py     # Windows 用 `python`
 GO — 5h at 42%, 133 min left, projected ~61% at reset — headroom available, can dispatch more. [7d: 71% — not near cap, ignore] (...)
 ```
 
@@ -134,10 +140,14 @@ Exit code：0=GO、1=PACE、2=STOP、3=無資料。`--json` 給程式吃。
 
 ## 硬上限後自動續跑（extras）
 
-`extras/windows/` 有一對 PowerShell 腳本可註冊一次性 Windows 排程：
 hard 警戒觸發且終端必須關閉時，Claude 寫好 `handoff.md`，排程在視窗
-重置後幾分鐘用 `claude -p` 繼續工作。使用前改一下工作目錄那行；
-macOS／Linux 用 `at` 或 user cron 可以做到一樣的事。
+重置後幾分鐘用 `claude -p` 繼續工作：
+
+- **Windows** — `extras/windows/` 註冊一次性 Scheduled Task（關終端、
+  登出都撐得住）。使用前改一下工作目錄那行。
+- **macOS／Linux** — `extras/unix/schedule-resume.sh` 用 `nohup` 掛計時
+  （關終端撐得住；要撐過登出／重開機改用 `at`、cron 或 launchd 註冊
+  同一個指令）。
 
 ## 會寫哪些檔案
 

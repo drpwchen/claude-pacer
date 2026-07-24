@@ -5,12 +5,17 @@ A statusline + budget guard + pacing verdict for Claude Code usage limits.
 [繁體中文說明 → README.zh-TW.md](README.zh-TW.md)
 
 ```
+Refactor auth middleware │ Ctx ▓▓▓░░░░░ 34% │ 5h ▓▓▓┃░░░░ 42%·2h13m │ 7d ▓▓▓▓▓┃░░ 71%·3d2h
 Ctx 34% │ 5h 42%·2h13m left·t58% │ 7d 71%·3d2h left·t55%
-Ctx ▓▓▓░░░░░ 34% │ 5h ▓▓▓┃░░░░ 42%·2h13m │ 7d ▓▓▓▓▓┃░░ 71%·3d2h
 ```
 
-There are many great Claude Code statuslines out there (ccusage, CCometixLine,
-cc-statusline, claude-powerline, …) — use whichever you like. This one exists
+There are many great Claude Code statuslines out there —
+[ccusage](https://github.com/ccusage/ccusage),
+[ccstatusline](https://github.com/sirmalloc/ccstatusline),
+[CCometixLine](https://github.com/Haleclipse/CCometixLine),
+[cc-statusline](https://github.com/chongdashu/cc-statusline),
+[claude-powerline](https://github.com/Owloops/claude-powerline), … —
+use whichever you like. This one exists
 because a statusline alone never stopped an autonomous agent from blowing
 through a rate limit at 2 AM. claude-pacer is three layers that share one data
 file:
@@ -26,7 +31,8 @@ file:
 
 ## Install
 
-Requires Node.js (statusline + guard) and Python 3 (verdict, optional).
+Works on Windows, macOS, and Linux. Requires Node.js (statusline + guard) and
+Python 3 (verdict, optional).
 
 ```bash
 git clone https://github.com/drpwchen/claude-pacer.git
@@ -80,8 +86,8 @@ Settings live in `~/.claude/claude-pacer/config.json` (created by you; see
 
 | Key | Default | Flag | Meaning |
 |---|---|---|---|
-| `display` | `"number"` | `--bar` / `--number` | Percent numbers vs bar gauges |
-| `topic` | `false` | `--topic` / `--no-topic` | Show conversation topic |
+| `display` | `"bar"` | `--bar` / `--number` | Bar gauges vs percent numbers |
+| `topic` | `true` | `--topic` / `--no-topic` | Show conversation topic |
 | `context` | `true` | `--context` / `--no-context` | Show context-window segment |
 | `labels` | `"en"` | — | `"zh"` renders 剩/時 labels |
 | `topic_chars` | `24` | — | Topic truncation length |
@@ -91,7 +97,8 @@ State dir override (all three scripts): `--dir <path>` or `$CLAUDE_PACER_DIR`.
 
 ### Topic mode
 
-Off by default. When enabled, the topic is resolved in priority order:
+On by default (`"topic": false` or `--no-topic` to hide it). The topic is
+resolved in priority order:
 
 1. **Session title** — Claude Code's own AI-generated/renamed session name
    (`/rename` or automatic), the most accurate description of the session;
@@ -119,7 +126,7 @@ Thresholds and intervals are in the `guard` section of `config.json`.
 ## usage_verdict.py
 
 ```
-$ python usage_verdict.py
+$ python3 usage_verdict.py     # `python` on Windows
 GO — 5h at 42%, 133 min left, projected ~61% at reset — headroom available, can dispatch more. [7d: 71% — not near cap, ignore] (...)
 ```
 
@@ -142,11 +149,16 @@ officially independent; no published conversion exists).
 
 ## Auto-resume after a hard cap (extras)
 
-`extras/windows/` has a pair of PowerShell scripts that register a one-shot
-Windows scheduled task: when the hard guard fires and the terminal must close,
-Claude writes a `handoff.md` and schedules `claude -p` to continue the work a
-few minutes after the window resets. Adapt the working-directory line before
-use; macOS/Linux users can achieve the same with `at` or a user cron entry.
+When the hard guard fires and the terminal must close, Claude writes a
+`handoff.md` and schedules `claude -p` to continue the work a few minutes
+after the window resets:
+
+- **Windows** — `extras/windows/` registers a one-shot Scheduled Task
+  (survives terminal exit and logout). Adapt the working-directory line
+  before use.
+- **macOS / Linux** — `extras/unix/schedule-resume.sh` arms a `nohup` timer
+  (survives the terminal closing; for logout/reboot resilience register the
+  same command with `at`, cron, or launchd instead).
 
 ## Files written
 

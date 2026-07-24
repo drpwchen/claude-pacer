@@ -1,6 +1,6 @@
 {
-  "display": "number",
-  "topic": false,
+  "display": "bar",
+  "topic": true,
   "context": true,
   "labels": "en",
   "topic_chars": 24,

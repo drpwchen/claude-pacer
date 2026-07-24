@@ -23,8 +23,8 @@ const HISTORY_FILE = path.join(DIR, 'limits-history.jsonl');
 const TOPIC_CACHE = path.join(DIR, 'topics.json');
 
 const DEFAULTS = {
-  display: 'number',   // 'number' | 'bar'
-  topic: false,        // show conversation topic (session title / summary / first prompt)
+  display: 'bar',      // 'bar' | 'number'
+  topic: true,         // show conversation topic (session title / summary / first prompt)
   context: true,       // show context-window fullness
   labels: 'en',        // 'en' | 'zh'
   topic_chars: 24,
