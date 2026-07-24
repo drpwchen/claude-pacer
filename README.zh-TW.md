@@ -27,6 +27,23 @@ Claude Code 用量 statusline＋額度警戒 hook＋配速判定，三件一組�
 3. **`usage_verdict.py`** — 給 agent 跑的：一行 GO／PACE／STOP 判定，
    內建 agent 最常算錯的視窗重置算術。
 
+## 為什麼做這個
+
+起點是半夜任務斷頭：睡前丟一個長時間自主任務給 Claude Code，凌晨兩點
+撞到 5 小時用量上限被硬生生停掉，隔天起來 context 卡在半路、工作做一半。
+guard＋verdict 這兩層就是為了讓這件事不再無聲發生：Claude 會在上限前
+自己收尾、存好進度、排程額度重置後自動續跑。
+
+statusline 則解決重度多開時的日常小摩擦：
+
+- **「這個視窗是在做什麼的？」**——多開幾個 session 就會忘，主題欄
+  幫每個對話掛名牌。
+- **「還剩多少可以跑？」**——用量長條疊上時間進度記號，一眼看出
+  燒得比時鐘快還是慢。
+- **「咦我模型開在哪個？」**——model＋effort 掛在最右邊，忘記切回來
+  之前就會先看到，不會拿高階模型的額度跑雜事。
+- **「context 快滿了嗎？」**——context 量表在突然 compact 之前先警告你。
+
 ## 安裝
 
 Windows／macOS／Linux 都能跑。需要 Node.js（statusline＋guard）；

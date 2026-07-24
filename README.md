@@ -29,6 +29,27 @@ file:
    raw numbers: a one-line GO / PACE / STOP verdict that encodes the reset
    arithmetic agents keep getting wrong.
 
+## Why this exists
+
+It started with overnight runs dying mid-task: hand Claude Code a long
+autonomous job, go to bed, and find it cut off at 2 AM by the 5-hour usage
+window — context stranded, work half-done. The guard + verdict layers exist
+so that never happens silently again: Claude winds down before the cap,
+saves its state, and schedules its own resume after the window resets.
+
+The statusline then fixes the small daily frictions of heavy multi-session
+use:
+
+- **"Which conversation is this again?"** — the topic segment names each
+  session when you're juggling several at once.
+- **"How much runway do I have?"** — usage bars with an elapsed-time marker
+  show at a glance whether you're burning faster than the clock.
+- **"Wait, which model am I on?"** — model + reasoning effort sit at the far
+  right, so you notice *before* spending premium-model quota on a trivial
+  task you forgot to switch back for.
+- **"How close is compaction?"** — the context gauge warns you before a
+  surprise compact eats your conversation state.
+
 ## Install
 
 Works on Windows, macOS, and Linux. Requires Node.js (statusline + guard) and
