@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.3 — 2026-07-24
+
+- Gentler responsive degrade: before dropping to the compact tier, retry the
+  FULL layout with a shorter topic (8 chars) — a line that misses the terminal
+  width by a few columns now keeps its bars, marker, and times.
+- Diagnostics: every render writes `width-last.json` (width source, chosen
+  tier, final line width) to the state dir — read it when the layout
+  surprises you.
+- `AGENTS.md` added — ground rules for AI coding agents working on this repo.
+
 ## v0.1.2 — 2026-07-24
 
 - Compact tier now pairs the bar with **time remaining** instead of a usage

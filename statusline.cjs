@@ -245,10 +245,10 @@ function persist(rl, model, now) {
 }
 
 // ---------- main ----------
-function buildLine(input, now, topic, level) {
+function buildLine(input, now, topic, level, topicMax) {
   const rl = input.rate_limits || {};
   const parts = [];
-  if (topic) parts.push(`${CYAN}${truncate(topic, level > 0 ? 10 : cfg.topic_chars)}${RESET}`);
+  if (topic) parts.push(`${CYAN}${truncate(topic, topicMax || (level > 0 ? 10 : cfg.topic_chars))}${RESET}`);
   parts.push(windowPart('5h', rl.five_hour, 5 * 3600 * 1000, now, level));
   parts.push(windowPart('7d', rl.seven_day, 7 * 24 * 3600 * 1000, now, level));
   if (cfg.context) parts.push(contextPart(input.context_window, level));
@@ -299,10 +299,30 @@ function render(input, opts) {
   const topic = cfg.topic ? ((opts && opts.demo) ? input.session_name : getTopic(input)) : null;
   if (cfg.tier in TIERS) return buildLine(input, now, topic, TIERS[cfg.tier]);
   const width = (opts && opts.width) || detectWidth();
-  let line = buildLine(input, now, topic, 0);
-  if (!width) return line; // width unknown — stay full rather than guess
-  for (let level = 1; level <= 2 && plainWidth(line) > width; level++) {
-    line = buildLine(input, now, topic, level);
+  // degrade gently: full → full with a shorter topic → compact → minimal
+  const steps = [
+    { level: 0, t: null }, { level: 0, t: 8 },
+    { level: 1, t: 8 }, { level: 2, t: 8 },
+  ];
+  let step = 0;
+  let line = buildLine(input, now, topic, 0, null);
+  if (width) {
+    while (step < steps.length - 1 && plainWidth(line) > width) {
+      step++;
+      line = buildLine(input, now, topic, steps[step].level, steps[step].t);
+    }
+  }
+  const level = steps[step].level;
+  if (!opts || !opts.demo) { // diagnostics: which width source won, which tier rendered
+    try {
+      fs.writeFileSync(path.join(DIR, 'width-last.json'), JSON.stringify({
+        ts: now, used: width || null, level,
+        cfg_width: cfg.width || null,
+        COLUMNS: process.env.COLUMNS || null,
+        stdout_columns: process.stdout.columns || null,
+        line_width: plainWidth(line),
+      }));
+    } catch {}
   }
   return line;
 }

@@ -83,8 +83,9 @@ tiers drop the marker — a 4-cell bar is too coarse for it.
 Colors: green < 70% ≤ yellow < 90% ≤ red.
 
 The line is **responsive**: it renders full-width first, and if that doesn't
-fit the terminal it degrades in two steps — compact (4-cell bars paired with
-*time remaining*, since the bar already shows usage), then percentages only.
+fit the terminal it degrades step by step — full with a shorter topic, then
+compact (4-cell bars paired with *time remaining*, since the bar already
+shows usage), then percentages only.
 Terminal width comes from the `$COLUMNS` env var, which Claude Code sets for
 the statusline process since v2.1.153 (fallbacks: `process.stdout.columns`,
 then probing the attached console — `mode con` on Windows, `stty size
