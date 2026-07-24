@@ -33,9 +33,11 @@ file:
 
 It started with overnight runs dying mid-task: hand Claude Code a long
 autonomous job, go to bed, and find it cut off at 2 AM by the 5-hour usage
-window — context stranded, work half-done. The guard + verdict layers exist
-so that never happens silently again: Claude winds down before the cap,
-saves its state, and schedules its own resume after the window resets.
+window — context stranded, work half-done. Plenty of tools auto-send
+"continue" after the crash; the point here is acting *before* the wall:
+past 85% Claude stops launching new heavy work, at 93% it finishes the step
+it's on cleanly and schedules its own resume in the same conversation — no
+half-written files, no broken mid-operation state to untangle.
 
 The statusline then fixes the small daily frictions of heavy multi-session
 use:
