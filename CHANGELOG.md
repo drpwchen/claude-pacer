@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Docs: README (both languages) now links to the beginner series and to the
+  post explaining why this tool exists. No runtime change.
+
 ## v0.1.3 — 2026-07-24
 
 - Gentler responsive degrade: before dropping to the compact tier, retry the

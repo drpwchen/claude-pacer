@@ -211,6 +211,21 @@ samples, ~2 min interval, auto-trimmed at 256 KB), `topics.json` (topic cache),
 `guard-state.json`, and your `config.json` / `pace.json`. Nothing leaves your
 machine; there are no network calls anywhere.
 
+## 🌱 Start here if you're new to AI agents
+
+This tool is one piece of my personal AI workflow. If you want to learn how to
+use AI agents like Claude Code from zero (no programming background needed), I
+wrote a beginner series (in Traditional Chinese):
+
+1. [從零開始：安裝、看懂 GitHub、跑起你的第一個工具](https://drpwchen.com/posts/getting-started/)
+2. [怎麼跟 AI agent 講話：心法、元技能與規則檔](https://drpwchen.com/posts/talking-to-agents/)
+3. [自動化流程不是設計出來的，是長出來的](https://drpwchen.com/posts/growing-your-workflow/)
+
+The story behind this particular tool →
+[為什麼我需要一個會踩煞車的 statusline](https://drpwchen.com/posts/claude-pacer/)
+
+Full map of my tools and posts → [drpwchen.com/map](https://drpwchen.com/map/)
+
 ## License
 
 MIT

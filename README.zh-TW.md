@@ -191,6 +191,20 @@ hard 警戒觸發且終端必須關閉時，Claude 寫好 `handoff.md`，排程�
 256 KB 自動修剪）、`topics.json`（主題快取）、`guard-state.json`，加上
 你自己的 `config.json`／`pace.json`。完全本機，任何地方都沒有網路呼叫。
 
+## 🌱 AI agent 新手起點
+
+這個工具是我個人 AI 工作流的一部分。想從零開始學怎麼用 Claude Code 這類 AI
+agent（不需要程式背景），可以從我的入門系列開始：
+
+1. [從零開始：安裝、看懂 GitHub、跑起你的第一個工具](https://drpwchen.com/posts/getting-started/)
+2. [怎麼跟 AI agent 講話：心法、元技能與規則檔](https://drpwchen.com/posts/talking-to-agents/)
+3. [自動化流程不是設計出來的，是長出來的](https://drpwchen.com/posts/growing-your-workflow/)
+
+這個工具本身的來龍去脈 →
+[為什麼我需要一個會踩煞車的 statusline](https://drpwchen.com/posts/claude-pacer/)
+
+所有工具與文章的全貌 → [drpwchen.com/map](https://drpwchen.com/map/)
+
 ## License
 
 MIT
