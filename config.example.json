@@ -14,6 +14,7 @@
     "stale_min": 15,
     "rearm_min": 10,
     "pace_interval_min": 15,
+    "near_reset_min": 20,
     "resume_hint": null
   }
 }

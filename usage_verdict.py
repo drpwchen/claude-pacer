@@ -38,11 +38,12 @@ LIMITS = os.path.join(DIR, "limits.json")
 HISTORY = os.path.join(DIR, "limits-history.jsonl")
 CONFIG = os.path.join(DIR, "config.json")
 
-SOFT, HARD = 85, 93
+SOFT, HARD, NEAR_RESET = 85, 93, 20
 try:
     cfg = json.load(open(CONFIG))
     cfg = cfg.get("guard", cfg)
     SOFT = cfg.get("soft_pct", SOFT); HARD = cfg.get("hard_pct", HARD)
+    NEAR_RESET = cfg.get("near_reset_min", NEAR_RESET)
 except Exception:
     pass
 
@@ -166,9 +167,21 @@ def main():
         pass
 
     # ---- verdict ----
-    if pct >= HARD:
+    # Near the reset the stakes shrink: hitting the cap only pauses work for the
+    # few minutes until the window turns over, so thresholds soften one level.
+    near_reset = remain_min <= NEAR_RESET
+    if pct >= HARD and near_reset:
+        verdict, code = "PACE", 1
+        why = ("5h at %d%% but window resets in %d min (%s) — worst case is a short pause until reset, "
+               "nothing lost. No wrap-up; just don't dispatch work sized to need more headroom than that"
+               % (pct, remain_min, clock(resets)))
+    elif pct >= HARD:
         verdict, code = "STOP", 2
         why = "5h at %d%% ≥ hard %d%% — wrap up now, schedule one-shot resume after %s" % (pct, HARD, clock(resets))
+    elif (pct >= SOFT or (projected is not None and projected >= 100)) and near_reset:
+        verdict, code = "GO", 0
+        why = ("5h at %d%% but window resets in %d min (%s) — near-reset exemption: cap risk only costs "
+               "a brief pause, work normally" % (pct, remain_min, clock(resets)))
     elif pct >= SOFT or (projected is not None and projected >= 100):
         verdict, code = "PACE", 1
         why = "5h at %d%%" % pct

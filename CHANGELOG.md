@@ -1,7 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.1.4 — 2026-08-04
 
+- **Near-reset exemption** (`guard.near_reset_min`, default 20): warnings now
+  scale with time-to-reset, not just usage %. With ≤20 min left, hitting the
+  cap only costs a brief pause — so the soft (85%) warning stays silent, the
+  hard (93%) one downgrades to "work normally, arm a one-shot resume only if
+  actually capped", and `usage_verdict.py` softens one level (STOP→PACE,
+  PACE→GO) with an explanatory note.
 - Docs: README (both languages) now links to the beginner series and to the
   post explaining why this tool exists. No runtime change.
 

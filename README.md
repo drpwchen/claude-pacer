@@ -156,6 +156,10 @@ long autonomous runs). Reads `limits.json` written by the statusline.
 - **soft (85%)**: tells Claude to finish in-flight work and start nothing big.
 - **hard (93%)**: tells Claude to wrap up NOW, schedule a one-shot resume a few
   minutes after the window resets, report to the user, and end the turn.
+- **Near-reset exemption** (`near_reset_min`, default 20): with ≤20 min left in
+  the window the stakes shrink — hitting the cap only pauses work until the
+  reset. The soft warning goes silent; the hard one downgrades to "work
+  normally, worst case is a brief pause, arm a one-shot resume if capped".
 - Warnings are **per-session and re-arm every 10 min**, so every concurrently
   running session/agent hears them — not just the first one.
 - Silent when the window has already reset (stale-high data can't false-fire).

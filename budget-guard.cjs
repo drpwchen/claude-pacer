@@ -25,7 +25,7 @@ const STATE_FILE = path.join(DIR, 'guard-state.json');
 const CONFIG_FILE = path.join(DIR, 'config.json');
 const PACE_FILE = path.join(DIR, 'pace.json');
 
-const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pace_interval_min: 15, resume_hint: null };
+const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pace_interval_min: 15, near_reset_min: 20, resume_hint: null };
 // usage_verdict.py ships next to this file; macOS/Linux usually have no bare `python`
 const PY = process.platform === 'win32' ? 'python' : 'python3';
 const VERDICT_CMD = `${PY} "${path.join(__dirname, 'usage_verdict.py')}"`;
@@ -81,6 +81,12 @@ function main() {
   if (pct >= cfg.hard_pct) level = 'hard';
   else if (pct >= cfg.soft_pct) level = 'soft';
 
+  // Near the reset the stakes shrink: hitting the cap only pauses work for the
+  // few minutes until the window turns over — not worth ordering a wind-down.
+  if (level && remainMin <= cfg.near_reset_min) {
+    level = level === 'hard' ? 'hard_near' : null;
+  }
+
   // ---- pace mode: periodic status line even below thresholds (opt-in) ----
   const pace = readJson(PACE_FILE, null);
   if (!level && pace && pace.on) {
@@ -107,6 +113,12 @@ function main() {
       `Start winding down: finish in-flight work, avoid starting new large/token-heavy work in this window. ` +
       `If you are a subagent/worker: complete your assigned unit at full quality — pacing is the dispatcher's decision, not yours. ` +
       `Dispatcher: run \`${VERDICT_CMD}\` before dispatching another wave. Briefly tell the user usage is at ${Math.round(pct)}%.`;
+  } else if (level === 'hard_near') {
+    msg = `[budget-guard] 5h usage at ${Math.round(pct)}%, but the window resets in ${remainMin}min (at ${resetClock}). ` +
+      `NO wind-down needed — worst case you hit the cap and pause until ${resetClock}, nothing is lost. Keep working normally; ` +
+      `just don't launch new work sized to need more headroom than that (e.g. a multi-agent wave). ` +
+      `If you DO hit the cap mid-task: arm a one-shot resume a few minutes after ${resetClock} ` +
+      `(in Claude Code: CronCreate via ToolSearch "select:CronCreate", recurring:false) and end the turn.`;
   } else {
     const headlessFallback = cfg.resume_hint
       ? `(3) ONLY if the terminal will close: write remaining tasks + resume instructions to ${path.join(DIR, 'handoff.md')}, then run ${cfg.resume_hint}. `
