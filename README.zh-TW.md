@@ -211,3 +211,8 @@ agent（不需要程式背景），可以從我的入門系列開始：
 ## License
 
 MIT
+
+## Support 支持
+
+覺得這個工具有幫助嗎？歡迎[請我喝飲料](https://drpwchen.com/support/) 🧋
+If this tool helped you, you can [buy me a drink](https://drpwchen.com/en/support/).
