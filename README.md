@@ -77,6 +77,12 @@ In `~/.claude/settings.json`:
 }
 ```
 
+On **macOS / Linux**, use an absolute path to `node` if Claude Code is
+launched from a GUI or a launch agent: that process may not inherit the PATH
+from your shell profile, and the statusline then silently renders nothing.
+`which node` gives you the path to paste (Homebrew: `brew install node` →
+`/opt/homebrew/bin/node` on Apple Silicon, `/usr/local/bin/node` on Intel).
+
 The statusline works on its own; add the hooks only if you want the guard.
 Usage percentages come from Claude Code's `rate_limits` statusline data, which
 exists on Pro/Max subscriptions (API-key billing has no such windows).

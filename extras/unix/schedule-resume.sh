@@ -15,8 +15,14 @@ WORKDIR="${1:-$PWD}"
 
 [ -f "$HANDOFF" ] || { echo "Handoff file not found: $HANDOFF — write the resume instructions first." >&2; exit 1; }
 
-RESETS_AT=$(python3 -c "import json;print(json.load(open('$DIR/limits.json'))['five_hour']['resets_at'])") \
-  || { echo "No resets_at in $DIR/limits.json" >&2; exit 1; }
+# Node is already a hard dependency of the statusline; python3 is the fallback.
+# Truncate to an integer either way — sh arithmetic below cannot take a float.
+RESETS_AT=$(node -e "console.log(Math.floor(JSON.parse(require('fs').readFileSync('$DIR/limits.json','utf-8')).five_hour.resets_at))" 2>/dev/null) \
+  || RESETS_AT=$(python3 -c "import json;print(int(json.load(open('$DIR/limits.json'))['five_hour']['resets_at']))" 2>/dev/null) \
+  || RESETS_AT=""
+case "$RESETS_AT" in
+  ''|*[!0-9]*) echo "No usable five_hour.resets_at in $DIR/limits.json" >&2; exit 1 ;;
+esac
 NOW=$(date +%s)
 DELAY=$(( RESETS_AT + 180 - NOW ))
 [ "$DELAY" -lt 0 ] && DELAY=0

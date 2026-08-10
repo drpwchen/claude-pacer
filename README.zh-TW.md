@@ -70,6 +70,12 @@ git clone https://github.com/drpwchen/claude-pacer.git
 }
 ```
 
+**macOS／Linux** 上，如果 Claude Code 是從 GUI 或 launch agent 啟動的，
+`node` 請填絕對路徑：那種啟動方式不會繼承你 shell profile 的 PATH，
+statusline 會安靜地不顯示。用 `which node` 取得路徑（Homebrew：
+`brew install node` → Apple Silicon 是 `/opt/homebrew/bin/node`、
+Intel 是 `/usr/local/bin/node`）。
+
 statusline 可以單獨用；想要警戒功能再加 hooks。用量百分比來自
 Claude Code 的 `rate_limits` statusline 資料（Pro/Max 訂閱才有；API key
 計費沒有這種視窗）。

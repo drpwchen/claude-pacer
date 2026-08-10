@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.5 — 2026-08-11
+
+- **Fix (macOS/Linux)**: the terminal-width probe leaked its child's stderr to
+  the parent, so every probe without a controlling tty printed
+  `/bin/sh: /dev/tty: Device not configured` into the terminal. Both probe
+  branches now run with stderr discarded.
+- `extras/unix/schedule-resume.sh`: is now executable in git (the README tells
+  you to run `./schedule-resume.sh`); reads `resets_at` via Node — already a
+  hard dependency — with `python3` only as a fallback; truncates it to an
+  integer and validates it before the `sh` arithmetic, which a float would
+  have broken.
+- Docs: install section now covers the two things that actually bite on
+  macOS/Linux — installing Node, and giving Claude Code an absolute `node`
+  path when the GUI/launchd PATH doesn't include your package manager's bin
+  directory.
+
 ## v0.1.4 — 2026-08-04
 
 - **Near-reset exemption** (`guard.near_reset_min`, default 20): warnings now

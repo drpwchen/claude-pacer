@@ -270,11 +270,14 @@ function probeTerminal() {
   try {
     const { execSync } = require('child_process');
     if (process.platform === 'win32') {
-      const out = execSync('mode con', { timeout: 1500, windowsHide: true }).toString();
+      const out = execSync('mode con', { timeout: 1500, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] }).toString();
       const nums = out.match(/\d+/g); // lines, columns, ... (locale-proof: order is fixed)
       if (nums && nums.length >= 2) w = parseInt(nums[1], 10) || null;
     } else {
-      const out = execSync('stty size < /dev/tty', { timeout: 1500, shell: '/bin/sh' }).toString();
+      // stdio silences the child's stderr: execSync inherits it by default, so a
+      // missing controlling tty would print "/dev/tty: Device not configured"
+      // into the user's terminal on every probe (macOS/Linux).
+      const out = execSync('stty size < /dev/tty', { timeout: 1500, shell: '/bin/sh', stdio: ['pipe', 'pipe', 'ignore'] }).toString();
       const m = out.trim().split(/\s+/); // "rows cols"
       if (m.length === 2) w = parseInt(m[1], 10) || null;
     }
