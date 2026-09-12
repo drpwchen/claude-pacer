@@ -25,7 +25,13 @@ const STATE_FILE = path.join(DIR, 'guard-state.json');
 const CONFIG_FILE = path.join(DIR, 'config.json');
 const PACE_FILE = path.join(DIR, 'pace.json');
 
-const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pace_interval_min: 15, near_reset_min: 20, resume_hint: null };
+const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pace_interval_min: 15, near_reset_min: 20, resume_hint: null, builtin_auto_continue: true };
+// builtin_auto_continue:true (default) = rely on Claude Code's built-in "Continue automatically at
+// usage limit" (/config, on by default since v2.1.234). It only fires when the limit interrupts a RUNNING turn,
+// so the guard must NOT tell Claude to stop: soft goes silent, hard says keep working, save state,
+// and don't launch new subagent waves (subagents do NOT auto-continue — they end failed and must
+// be resumed by the main session after the reset). Set false on Claude Code < v2.1.234 or with the
+// /config option off: the legacy path then tells Claude to arm a one-shot CronCreate / handoff.md.
 // usage_verdict.py ships next to this file; macOS/Linux usually have no bare `python`
 const PY = process.platform === 'win32' ? 'python' : 'python3';
 const VERDICT_CMD = `${PY} "${path.join(__dirname, 'usage_verdict.py')}"`;
@@ -99,6 +105,7 @@ function main() {
       `Dispatcher: between waves run \`${VERDICT_CMD}\` (GO/PACE/STOP) — never interpret limits.json yourself.`);
     return;
   }
+  if (level === 'soft' && cfg.builtin_auto_continue !== false) level = null;  // builtin mode: no wind-down
   if (!level) return;
 
   // ---- soft/hard safety net: per-session, re-arms every rearm_min ----
@@ -117,8 +124,17 @@ function main() {
     msg = `[budget-guard] 5h usage at ${Math.round(pct)}%, but the window resets in ${remainMin}min (at ${resetClock}). ` +
       `NO wind-down needed — worst case you hit the cap and pause until ${resetClock}, nothing is lost. Keep working normally; ` +
       `just don't launch new work sized to need more headroom than that (e.g. a multi-agent wave). ` +
-      `If you DO hit the cap mid-task: arm a one-shot resume a few minutes after ${resetClock} ` +
-      `(in Claude Code: CronCreate via ToolSearch "select:CronCreate", recurring:false) and end the turn.`;
+      (cfg.builtin_auto_continue !== false
+        ? `If you DO hit the cap mid-task: nothing to do — Claude Code's built-in auto-continue resumes this turn after ${resetClock}. Do NOT end the turn early, do NOT arm a cron or write a handoff file.`
+        : `If you DO hit the cap mid-task: arm a one-shot resume a few minutes after ${resetClock} ` +
+          `(in Claude Code: CronCreate via ToolSearch "select:CronCreate", recurring:false) and end the turn.`);
+  } else if (cfg.builtin_auto_continue !== false) {
+    msg = `[budget-guard] 5h usage at ${Math.round(pct)}% (resets in ${remainMin}min, at ${resetClock}). You may get paused before then — that is fine. ` +
+      `(1) KEEP WORKING. Do NOT wind down and do NOT end the turn early: Claude Code's built-in auto-continue only resumes a turn that the limit interrupted, and it resumes it after ${resetClock} on its own. No CronCreate, no handoff file. ` +
+      `(2) Save in-progress state now (commit / write files) — the continuation prompt says "pick up where you stopped", so unsaved half-done work gets redone. ` +
+      `(3) Dispatcher: launch NO new subagent waves until after ${resetClock} — subagents do NOT auto-continue; one that hits the cap ends as failed and you must resume or re-dispatch it. Let running ones finish. ` +
+      `After the auto-continue fires, first check for failed subagents and resume them. ` +
+      `(4) Briefly tell the user: usage %, reset time, and that the session will auto-continue if paused.`;
   } else {
     const headlessFallback = cfg.resume_hint
       ? `(3) ONLY if the terminal will close: write remaining tasks + resume instructions to ${path.join(DIR, 'handoff.md')}, then run ${cfg.resume_hint}. `

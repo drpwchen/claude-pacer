@@ -166,6 +166,16 @@ long autonomous runs). Reads `limits.json` written by the statusline.
   the window the stakes shrink — hitting the cap only pauses work until the
   reset. The soft warning goes silent; the hard one downgrades to "work
   normally, worst case is a brief pause, arm a one-shot resume if capped".
+- **`builtin_auto_continue`** (default `true`): the guard assumes Claude Code's
+  own **Continue automatically at usage limit** (`/config`, on by default since
+  v2.1.234) does the resuming. That feature only resumes a turn the limit
+  *interrupted*, so the guard never tells Claude to stop: the soft warning goes
+  silent, and the hard one says keep working, save in-progress state, and
+  launch no new subagent waves — subagents do **not** auto-continue (they end
+  as failed and the main session must resume them after the reset). Set it to
+  `false` on Claude Code < v2.1.234, or if you turned the `/config` option off:
+  the hard warning then tells Claude to arm a one-shot CronCreate (or
+  `handoff.md` + the resume script) instead.
 - Warnings are **per-session and re-arm every 10 min**, so every concurrently
   running session/agent hears them — not just the first one.
 - Silent when the window has already reset (stale-high data can't false-fire).

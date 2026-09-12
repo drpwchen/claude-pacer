@@ -15,6 +15,7 @@
     "rearm_min": 10,
     "pace_interval_min": 15,
     "near_reset_min": 20,
-    "resume_hint": null
+    "resume_hint": null,
+    "builtin_auto_continue": true
   }
 }

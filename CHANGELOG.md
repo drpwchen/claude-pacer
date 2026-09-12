@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.1.6 — 2026-09-12
+
+- **Behaviour change — `guard.builtin_auto_continue` (default `true`)**: the
+  guard now assumes Claude Code's own "Continue automatically at usage limit"
+  (`/config`, on by default since v2.1.234) does the resuming. That feature
+  only resumes a turn the limit *interrupted*, so the old hard warning ("wrap
+  up, arm a one-shot resume, end the turn") actively defeated it. Now: soft
+  (85%) is silent; hard (93%) and near-reset say keep working, save in-progress
+  state, no CronCreate / `handoff.md`, and launch no new subagent waves
+  (subagents do not auto-continue — they end as failed and must be resumed
+  after the reset).
+- Set `"builtin_auto_continue": false` to keep the previous CronCreate /
+  `handoff.md` + resume-script path (Claude Code < v2.1.234, or the `/config`
+  option turned off). `resume_hint` still applies only in that mode.
+
 ## v0.1.5 — 2026-08-11
 
 - **Fix (macOS/Linux)**: the terminal-width probe leaked its child's stderr to
