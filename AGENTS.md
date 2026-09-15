@@ -31,6 +31,16 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
 - **Verify with `node statusline.cjs --demo`** (all tiers, both display
   modes) plus a synthetic-stdin render before committing. There is no test
   suite; the demo is the smoke test.
+- **The 5h and 7d windows are independent.** There is no official conversion
+  and none may be derived (no `7d ÷ 7`, no linear mapping, never infer one %
+  from the other). `usage_verdict.py --ratio` *measures* the plan's cap ratio
+  from paired deltas in `limits-history.jsonl`; that is the only sanctioned
+  number, and it is a snapshot — re-measure after any limit change.
+- **`guard.builtin_auto_continue` (default `true`) means the guard must never
+  tell Claude to stop.** Claude Code's own auto-continue only resumes a turn
+  the limit *interrupted*; a guard that makes Claude end its turn cleanly
+  defeats it (the first cut of v0.1.6 got this backwards). Soft is silent;
+  hard says keep working, save state, start no new subagent waves.
 
 ## Release checklist
 
@@ -38,6 +48,8 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
 2. Keep `README.md` and `README.zh-TW.md` in sync — every behavior/config
    change appears in BOTH.
 3. Commit, tag `vX.Y.Z`, push master + tag.
+4. Docs-only edits (README, this file) ride the next release tag; they are
+   not tagged on their own.
 
 ## Layout notes
 
@@ -50,3 +62,16 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
   cell again (v0.1.1 bug).
 - `width-last.json` in the state dir records the last render's width sources
   and chosen tier — read it first when debugging layout complaints.
+
+## Maintainer notes (the author's own deployment — other users can ignore)
+
+- This repo is the source of truth. The live copies Claude Code actually runs
+  are `~/.claude/hooks/statusline-v2/{statusline,budget-guard}.cjs` (the
+  folder name is historical; `settings.json` points there) and
+  `usage_verdict.py` duplicated to `~/.claude/scripts/`. After every release,
+  copy the three files to those locations — a release that is not synced
+  changes nothing on the author's machine.
+- State dir is `~/.claude/claude-pacer/` (`config.json`, `limits.json`,
+  `limits-history.jsonl`, `width-last.json`, `handoff.md`). The old
+  `~/.claude/statusline-v2/` state dir and `hooks/statusline-v2/bak-20260724/`
+  are rollback only — any doc calling them live is stale; fix on sight.
