@@ -152,14 +152,19 @@ state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本�
 - **近重置豁免**（`near_reset_min`，預設 20）：視窗只剩 ≤20 分鐘時，
   撞牆的代價只是暫停到重置而已——soft 警告直接靜默；hard 降級成
   「照常工作，最壞就是短暫停一下，真撞牆再排一次性 resume」。
-- **`builtin_auto_continue`**（預設 `true`）：guard 假設由 Claude Code 內建的
-  **Continue automatically at usage limit**（`/config`，v2.1.234 起預設開）
-  負責續跑。那個功能只接回「被限制打斷」的回合，所以 guard 絕不叫 Claude 停：
-  soft 警告靜默，hard 警告改成「繼續跑、先存好進行中的狀態、別再放新的
-  subagent 波次」——subagent **不會**自動續跑（撞牆就 failed，重置後要由主
-  session resume）。Claude Code 低於 v2.1.234、或你把 `/config` 那項關掉時
-  設成 `false`：hard 警告會改回叫 Claude 排一次性 CronCreate（或 `handoff.md`＋
-  resume 腳本）。
+- **`builtin_auto_continue`**（預設 `false`）：`false` 時由 guard 自己排續跑——
+  就是上面的 hard 警告（一次性 CronCreate；終端要關就 `handoff.md`＋resume
+  腳本）。設成 `true` 則改靠 Claude Code 內建的 **Continue automatically at
+  usage limit**（`/config`）續跑。那個功能只接回「被限制打斷」的回合，所以
+  這個模式下 guard 絕不叫 Claude 停：soft 警告靜默，hard 警告改成「繼續跑、
+  先存好進行中的狀態、別再放新的 subagent 波次」——subagent **不會**自動續跑
+  （撞牆就 failed，重置後要由主 session resume）。v0.1.6 曾以 `true` 為預設；
+  作者的多 session 實際使用中內建續跑從沒觸發過，v0.1.7 改回——確定它在你的
+  環境真的會動再開。
+- **限制：guard 只跟得上取樣速度。** 用量是在 statusline 渲染時才讀到（約 2
+  分鐘一次）。一群 agent 每分鐘燒好幾 % 時，可能兩次取樣之間就從 93% 以下
+  直接撞牆——警告來不及送到，也就排不了續跑。這種批次請用
+  `usage_verdict.py`／配速模式控制派工，別指望 hard 警告。
 - 警告**每個 session 各自觸發、每 10 分鐘重新武裝**——多個並行
   session/agent 都聽得到，不會只有第一個聽到。
 - 視窗已重置時保持沉默（過期的高數字不會誤報）。
@@ -193,7 +198,9 @@ Exit code：0=GO、1=PACE、2=STOP、3=無資料。`--json` 給程式吃。
 ## 硬上限後自動續跑（extras）
 
 hard 警戒觸發且終端必須關閉時，Claude 寫好 `handoff.md`，排程在視窗
-重置後幾分鐘用 `claude -p` 繼續工作：
+重置後幾分鐘用 `claude -p` 繼續工作。沒設 `resume_hint` 時，guard 會自動
+指名你這個 OS 的腳本（前提是 `extras/` 跟 `budget-guard.cjs` 放在一起，
+也就是直接從 clone 下來的目錄執行）：
 
 - **Windows** — `extras/windows/` 註冊一次性 Scheduled Task（關終端、
   登出都撐得住）。使用前改一下工作目錄那行。

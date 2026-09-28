@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.1.7 — 2026-09-28
+
+- **Default reverted — `guard.builtin_auto_continue` is `false` again.** In
+  real multi-session use, sessions that hit the 5h cap under the v0.1.6
+  default were never resumed by Claude Code's built-in auto-continue — they
+  sat idle past the reset until resumed by hand. The hard (93%) warning is
+  back to: wrap up the current step, arm a one-shot CronCreate resume for a
+  few minutes after the reset, end the turn. `true` is still available if
+  the built-in option works in your setup.
+- With no `resume_hint` set, the "terminal will close" fallback now points
+  Claude at the bundled resume script for the current OS
+  (`extras/windows/schedule-resume.ps1` on Windows,
+  `extras/unix/schedule-resume.sh` on macOS/Linux) when it sits next to
+  `budget-guard.cjs`; otherwise it still tells the user to restart after the
+  reset.
+- Docs: the guard only sees usage when a statusline renders (~every 2 min),
+  so a fleet burning several %/min can jump from below 93% straight to the
+  cap between samples — then no warning arrives in time and no resume gets
+  armed. Pace such runs with `usage_verdict.py` / pace mode.
+
 ## v0.1.6 — 2026-09-12
 
 - **Behaviour change — `guard.builtin_auto_continue` (default `true`)**: the

@@ -36,11 +36,14 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
   from the other). `usage_verdict.py --ratio` *measures* the plan's cap ratio
   from paired deltas in `limits-history.jsonl`; that is the only sanctioned
   number, and it is a snapshot — re-measure after any limit change.
-- **`guard.builtin_auto_continue` (default `true`) means the guard must never
-  tell Claude to stop.** Claude Code's own auto-continue only resumes a turn
-  the limit *interrupted*; a guard that makes Claude end its turn cleanly
-  defeats it (the first cut of v0.1.6 got this backwards). Soft is silent;
-  hard says keep working, save state, start no new subagent waves.
+- **`guard.builtin_auto_continue` defaults to `false`** (v0.1.7 revert):
+  the guard arms its own resume (one-shot CronCreate / `handoff.md` + the
+  per-OS `extras/` script). v0.1.6 defaulted to `true`, and on 2026-09-27
+  several herdr sessions that hit the cap were never resumed by the built-in
+  feature. Don't flip the default back without a verified end-to-end resume.
+  When a user sets `true`, the guard must never tell Claude to stop — the
+  built-in auto-continue only resumes a turn the limit *interrupted*. Soft is
+  silent; hard says keep working, save state, start no new subagent waves.
 
 ## Release checklist
 

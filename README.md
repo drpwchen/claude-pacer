@@ -166,16 +166,24 @@ long autonomous runs). Reads `limits.json` written by the statusline.
   the window the stakes shrink — hitting the cap only pauses work until the
   reset. The soft warning goes silent; the hard one downgrades to "work
   normally, worst case is a brief pause, arm a one-shot resume if capped".
-- **`builtin_auto_continue`** (default `true`): the guard assumes Claude Code's
-  own **Continue automatically at usage limit** (`/config`, on by default since
-  v2.1.234) does the resuming. That feature only resumes a turn the limit
-  *interrupted*, so the guard never tells Claude to stop: the soft warning goes
-  silent, and the hard one says keep working, save in-progress state, and
-  launch no new subagent waves — subagents do **not** auto-continue (they end
-  as failed and the main session must resume them after the reset). Set it to
-  `false` on Claude Code < v2.1.234, or if you turned the `/config` option off:
-  the hard warning then tells Claude to arm a one-shot CronCreate (or
-  `handoff.md` + the resume script) instead.
+- **`builtin_auto_continue`** (default `false`): with `false` the guard arms
+  the resume itself — the hard warning above (one-shot CronCreate, or
+  `handoff.md` + the resume script if the terminal will close). Set `true` to
+  rely on Claude Code's own **Continue automatically at usage limit**
+  (`/config`) instead. That feature only resumes a turn the limit
+  *interrupted*, so in this mode the guard never tells Claude to stop: the soft
+  warning goes silent, and the hard one says keep working, save in-progress
+  state, and launch no new subagent waves — subagents do **not** auto-continue
+  (they end as failed and the main session must resume them after the reset).
+  `true` was the default in v0.1.6; in the author's multi-session setup the
+  built-in resume never fired, so v0.1.7 reverted it — try it only if you've
+  seen it work for you.
+- **Limit: the guard is only as fast as its samples.** Usage is read when a
+  statusline renders (~every 2 min). A fleet of agents burning several %/min
+  can go from below 93% straight to the cap between two samples; then no
+  warning lands in time and no resume gets armed. For such runs, pace the
+  dispatch with `usage_verdict.py` / pace mode rather than relying on the
+  hard warning.
 - Warnings are **per-session and re-arm every 10 min**, so every concurrently
   running session/agent hears them — not just the first one.
 - Silent when the window has already reset (stale-high data can't false-fire).
@@ -214,7 +222,9 @@ officially independent; no published conversion exists).
 
 When the hard guard fires and the terminal must close, Claude writes a
 `handoff.md` and schedules `claude -p` to continue the work a few minutes
-after the window resets:
+after the window resets. With no `resume_hint` set, the guard names the
+script for your OS automatically (when `extras/` sits next to
+`budget-guard.cjs`, i.e. you run it from the clone):
 
 - **Windows** — `extras/windows/` registers a one-shot Scheduled Task
   (survives terminal exit and logout). Adapt the working-directory line

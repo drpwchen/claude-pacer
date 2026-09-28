@@ -25,13 +25,14 @@ const STATE_FILE = path.join(DIR, 'guard-state.json');
 const CONFIG_FILE = path.join(DIR, 'config.json');
 const PACE_FILE = path.join(DIR, 'pace.json');
 
-const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pace_interval_min: 15, near_reset_min: 20, resume_hint: null, builtin_auto_continue: true };
-// builtin_auto_continue:true (default) = rely on Claude Code's built-in "Continue automatically at
-// usage limit" (/config, on by default since v2.1.234). It only fires when the limit interrupts a RUNNING turn,
-// so the guard must NOT tell Claude to stop: soft goes silent, hard says keep working, save state,
-// and don't launch new subagent waves (subagents do NOT auto-continue — they end failed and must
-// be resumed by the main session after the reset). Set false on Claude Code < v2.1.234 or with the
-// /config option off: the legacy path then tells Claude to arm a one-shot CronCreate / handoff.md.
+const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pace_interval_min: 15, near_reset_min: 20, resume_hint: null, builtin_auto_continue: false };
+// builtin_auto_continue:false (default since v0.1.7) = the guard arms the resume itself: hard tells
+// Claude to wrap up, arm a one-shot CronCreate (or handoff.md + resume script) and end the turn.
+// true = rely on Claude Code's built-in "Continue automatically at usage limit" (/config). It only
+// fires when the limit interrupts a RUNNING turn, so the guard must NOT tell Claude to stop: soft goes
+// silent, hard says keep working, save state, and don't launch new subagent waves (subagents do NOT
+// auto-continue — they end failed and must be resumed by the main session after the reset).
+// v0.1.6 made true the default; in real multi-session use the built-in resume never fired, hence the revert.
 // usage_verdict.py ships next to this file; macOS/Linux usually have no bare `python`
 const PY = process.platform === 'win32' ? 'python' : 'python3';
 const VERDICT_CMD = `${PY} "${path.join(__dirname, 'usage_verdict.py')}"`;
@@ -136,8 +137,9 @@ function main() {
       `After the auto-continue fires, first check for failed subagents and resume them. ` +
       `(4) Briefly tell the user: usage %, reset time, and that the session will auto-continue if paused.`;
   } else {
-    const headlessFallback = cfg.resume_hint
-      ? `(3) ONLY if the terminal will close: write remaining tasks + resume instructions to ${path.join(DIR, 'handoff.md')}, then run ${cfg.resume_hint}. `
+    const hint = cfg.resume_hint || defaultResumeHint();
+    const headlessFallback = hint
+      ? `(3) ONLY if the terminal will close: write remaining tasks + resume instructions to ${path.join(DIR, 'handoff.md')}, then run ${hint}. `
       : `(3) ONLY if the terminal will close: write remaining tasks + resume instructions to ${path.join(DIR, 'handoff.md')} and tell the user to restart after ${resetClock}. `;
     msg = `[budget-guard] 5h usage at ${Math.round(pct)}% — WRAP UP NOW (resets in ${remainMin}min, at ${resetClock}). ` +
       `(1) Minimal completion of the current step (commit/save state), start nothing new. ` +
@@ -149,6 +151,18 @@ function main() {
       `(4) Tell the user: usage %, reset time, which resume layer is armed. Then END THE TURN. Do NOT keep working past this point.`;
   }
   emit(input, msg);
+}
+
+// The bundled extras/ resume script for this OS, if it sits next to this file (i.e. run from a clone).
+function defaultResumeHint() {
+  try {
+    const win = process.platform === 'win32';
+    const script = win ? path.join(__dirname, 'extras', 'windows', 'schedule-resume.ps1')
+                       : path.join(__dirname, 'extras', 'unix', 'schedule-resume.sh');
+    if (!fs.existsSync(script)) return null;
+    return win ? `\`powershell -NoProfile -ExecutionPolicy Bypass -File "${script}"\` (set $WorkDir in resume-runner.ps1 first)`
+               : `\`sh "${script}" "<project dir>"\``;
+  } catch { return null; }
 }
 
 function save(state) {
