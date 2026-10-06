@@ -11,15 +11,29 @@ wrong:
      when a statusline renders, i.e. after someone types).
   2. 7d false alarms: a high 7d% is IGNORED when the 7d window resets before the
      current 5h window ends — it cannot constrain anything you do now.
-  3. Burn-rate projection (multi-agent aware): projects end-of-window usage from
-     recent samples; bursty dispatch makes this a lower bound, so the hard STOP
-     threshold still rules.
+  3. Pace-aware projection: pace = used% / elapsed% of the 5h window (<1 =
+     behind pace, headroom). Projection = max(whole-window average rate,
+     least-squares slope of the last 30 min extrapolated only over the span it
+     was sampled, average rate beyond). A projected overrun alone triggers PACE
+     only when pace >= 0.9 — a dispatch burst while behind pace is reported, not
+     acted on. Right after a burst the projection OVERestimates; the hard STOP
+     threshold still rules either way. In the first 20 min of a window the
+     projection never triggers PACE on its own (1% after 1 min would project
+     300%) — only pct >= soft does.
+  4. Clock: reset times print HH:MM when they fall on the same day as now,
+     MM-DD HH:MM otherwise, so a reset tomorrow is never read as today.
+
+Single copy: budget-guard.cjs tells agents to run the usage_verdict.py next to
+it. To keep one shared copy elsewhere (e.g. ~/.claude/scripts/), put
+extras/usage_verdict_shim.py next to budget-guard.cjs under that name — it runs
+THIS file, so there is only ever one copy to edit.
 
 State dir: --dir <path> > $CLAUDE_PACER_DIR > ~/.claude/claude-pacer
 
 Usage:  python usage_verdict.py [--json] [--dir <path>]
         python usage_verdict.py --ratio   # estimate 7d/5h cap ratio
 Exit codes: 0=GO, 1=PACE, 2=STOP, 3=no data.
+Test clock: $USAGE_VERDICT_NOW (epoch seconds) overrides now.
 
 --ratio: empirically estimates cap_7d/cap_5h from limits-history.jsonl. Both
 windows count the same (model-weighted) consumption C, so over an interval
@@ -39,6 +53,7 @@ HISTORY = os.path.join(DIR, "limits-history.jsonl")
 CONFIG = os.path.join(DIR, "config.json")
 
 SOFT, HARD, NEAR_RESET = 85, 93, 20
+EARLY_MIN = 20  # window minutes before the projection may trigger PACE by itself
 try:
     cfg = json.load(open(CONFIG))
     cfg = cfg.get("guard", cfg)
@@ -48,8 +63,15 @@ except Exception:
     pass
 
 
+NOW = float(os.environ.get("USAGE_VERDICT_NOW") or time.time())
+
+
 def clock(ts):
-    return datetime.datetime.fromtimestamp(ts).strftime("%H:%M")
+    """HH:MM if on the same day as NOW, else MM-DD HH:MM so a reset tomorrow isn't read as today."""
+    t = datetime.datetime.fromtimestamp(ts)
+    if t.date() == datetime.datetime.fromtimestamp(NOW).date():
+        return t.strftime("%H:%M")
+    return t.strftime("%m-%d %H:%M")
 
 
 def estimate_ratio():
@@ -97,7 +119,7 @@ def main():
     if "--ratio" in sys.argv:
         return estimate_ratio()
     as_json = "--json" in sys.argv
-    now = time.time()
+    now = NOW
     try:
         d = json.load(open(LIMITS))
     except Exception:
@@ -143,66 +165,82 @@ def main():
                 " — BINDING, near cap" if sd_binding else " — not near cap, ignore")
     out["seven_day"] = {"note": sd_note, "binding": sd_binding}
 
-    # ---- burn-rate projection from history (last 30 min inside this window) ----
-    projected = None
+    # ---- pace + projection ----
+    window_start = resets - 5 * 3600
+    elapsed_min = max((now - window_start) / 60, 1.0)
+    elapsed_pct = elapsed_min / 300 * 100
+    pace = round(pct / elapsed_pct, 2)
+    out["five_hour"].update(elapsed_pct=round(elapsed_pct), pace=pace)
+    avg_rate = pct / elapsed_min  # %/min over the whole window so far
+    projected = round(pct + avg_rate * remain_min)
+    recent_rate = None
     try:
-        window_start = resets - 5 * 3600
-        samples = []
+        pts = []
         with open(HISTORY) as f:
             for line in f:
                 try:
                     s = json.loads(line)
                 except Exception:
                     continue
-                if s.get("ts", 0) / 1000 >= max(window_start, now - 1800) and s.get("pct") is not None:
-                    samples.append(s)
-        if len(samples) >= 2:
-            t0, p0 = samples[0]["ts"] / 1000, samples[0]["pct"]
-            t1, p1 = samples[-1]["ts"] / 1000, samples[-1]["pct"]
-            if t1 - t0 >= 600 and p1 >= p0:
-                slope = (p1 - p0) / ((t1 - t0) / 60)  # %/min
-                projected = round(pct + slope * remain_min)
-                out["projected_at_reset"] = projected
+                t = s.get("ts", 0) / 1000
+                if max(window_start, now - 1800) <= t <= now and s.get("pct") is not None:
+                    pts.append((t / 60, s["pct"]))
+        span = (pts[-1][0] - pts[0][0]) if pts else 0
+        if len(pts) >= 4 and span >= 15:
+            mt = sum(t for t, _ in pts) / len(pts); mp = sum(p for _, p in pts) / len(pts)
+            var = sum((t - mt) ** 2 for t, _ in pts)
+            recent_rate = sum((t - mt) * (p - mp) for t, p in pts) / var  # least-squares %/min
+            if recent_rate > 0:
+                p_recent = pct + recent_rate * min(remain_min, span) + avg_rate * max(0, remain_min - span)
+                projected = max(projected, round(p_recent))
     except Exception:
         pass
+    out["projected_at_reset"] = projected
+    burst = recent_rate is not None and recent_rate > avg_rate * 1.5 and projected >= 100
+    early = elapsed_min < EARLY_MIN  # too few minutes in for a rate to mean anything
+    proj_over = projected >= 100 and pace >= 0.9 and not early
 
     # ---- verdict ----
     # Near the reset the stakes shrink: hitting the cap only pauses work for the
     # few minutes until the window turns over, so thresholds soften one level.
+    # why = the core reason; tail = optional detail printed AFTER the [7d: ...]
+    # note, so callers that truncate the line (e.g. to 200 chars) keep it.
     near_reset = remain_min <= NEAR_RESET
+    tail = ""
     if pct >= HARD and near_reset:
         verdict, code = "PACE", 1
         why = ("5h at %d%% but window resets in %d min (%s) — worst case is a short pause until reset, "
-               "nothing lost. No wrap-up; just don't dispatch work sized to need more headroom than that"
-               % (pct, remain_min, clock(resets)))
+               "nothing lost" % (pct, remain_min, clock(resets)))
+        tail = "No wrap-up; just don't dispatch work sized to need more headroom than that"
     elif pct >= HARD:
         verdict, code = "STOP", 2
         why = "5h at %d%% ≥ hard %d%% — wrap up now, schedule one-shot resume after %s" % (pct, HARD, clock(resets))
-    elif (pct >= SOFT or (projected is not None and projected >= 100)) and near_reset:
+    elif (pct >= SOFT or proj_over) and near_reset:
         verdict, code = "GO", 0
         why = ("5h at %d%% but window resets in %d min (%s) — near-reset exemption: cap risk only costs "
                "a brief pause, work normally" % (pct, remain_min, clock(resets)))
-    elif pct >= SOFT or (projected is not None and projected >= 100):
+    elif pct >= SOFT or proj_over:
         verdict, code = "PACE", 1
         why = "5h at %d%%" % pct
         if pct < SOFT:
-            why += " but projected ~%d%% at reset" % projected
+            why += " but projected ~%d%% at reset (pace %.2f)" % (projected, pace)
         why += " — finish in-flight work, dispatch new waves cautiously"
     else:
         verdict, code = "GO", 0
-        why = "5h at %d%%, %d min left" % (pct, remain_min)
-        if projected is not None:
-            why += ", projected ~%d%% at reset" % projected
-            if projected < 90:
-                why += " — headroom available, can dispatch more"
-        else:
-            why += " — headroom available"
+        why = "5h at %d%%, %d min left, %s pace (%.2f = %d%% used / %d%% elapsed), projected ~%d%% at reset" % (
+            pct, remain_min, "behind" if pace < 1 else "ahead of", pace, pct, round(elapsed_pct), projected)
+        if early and projected >= 100:
+            tail = "window only %d min old — projection not acted on yet" % elapsed_min
+        elif burst:
+            tail = "recent burst %.2f%%/min (window avg %.2f), not acted on while behind pace" % (recent_rate, avg_rate)
+        elif projected < 90:
+            tail = "headroom available, can dispatch more"
     if sd_binding:
-        why += ". CAUTION: 7d is binding (%s)" % sd_note
+        tail += ("; " if tail else "") + "CAUTION: 7d is binding"
 
     out["verdict"] = verdict
-    line = "%s — %s. [7d: %s] (projection is a lower bound under bursty multi-agent dispatch; %d%% STOP still rules)" % (
-        verdict, why, sd_note or "no data", HARD)
+    line = "%s — %s. [7d: %s]%s (projection overestimates right after a dispatch burst; %d%% STOP still rules)" % (
+        verdict, why, sd_note or "no data", (" " + tail + ".") if tail else "", HARD)
     print(json.dumps(out) if as_json else line)
     return code
 

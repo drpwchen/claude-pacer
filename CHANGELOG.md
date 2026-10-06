@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.1.8 — 2026-10-06
+
+- **`usage_verdict.py` is pace-aware.** It now reports *pace* (used % ÷
+  elapsed % of the 5h window; below 1 = behind pace) and projects from the
+  larger of the whole-window average rate and the last 30 minutes' trend
+  (least-squares, extrapolated only as far as it was sampled). A projected
+  overrun alone triggers PACE only when pace ≥ 0.9, so a dispatch burst while
+  you are behind pace is reported instead of halting work. `--json` gains
+  `five_hour.pace` / `five_hour.elapsed_pct`, and `projected_at_reset` is
+  present whenever the window has not reset yet (before, it needed 10+ min
+  of history).
+- **No PACE from projection in the first 20 minutes of a window.** 1% after
+  one minute used to "project" 300% and say PACE; now only the soft threshold
+  can trigger PACE that early. The GO line says the projection is not acted on
+  yet.
+- **Reset times carry the date when they are not today.** `usage_verdict.py`
+  and `budget-guard.cjs` print `HH:MM` for a reset later today and
+  `MM-DD HH:MM` otherwise, so a reset at 01:00 tomorrow no longer reads as
+  01:00 today.
+- Verdict line order is fixed: verdict → core reason → `[7d: …]` → optional
+  detail → footer, so callers that truncate the line keep the 7d note.
+- `USAGE_VERDICT_NOW=<epoch seconds>` pins the clock for both scripts (tests).
+- New `test_usage_verdict.py` (stdlib `unittest`, timezone-independent;
+  the budget-guard case is skipped without node).
+- New `extras/usage_verdict_shim.py`: an optional thin wrapper for keeping one
+  shared copy of the verdict in `~/.claude/scripts/` while `budget-guard.cjs`
+  keeps pointing at the file next to it.
+
 ## v0.1.7 — 2026-09-28
 
 - **Default reverted — `guard.builtin_auto_continue` is `false` again.** In

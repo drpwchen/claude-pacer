@@ -178,19 +178,38 @@ state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本�
 
 ```
 $ python3 usage_verdict.py     # Windows 用 `python`
-GO — 5h at 42%, 133 min left, projected ~61% at reset — headroom available, can dispatch more. [7d: 71% — not near cap, ignore] (...)
+GO — 5h at 42%, 133 min left, behind pace (0.75 = 42% used / 56% elapsed), projected ~75% at reset. [7d: 7d 71% (resets 10-09 13:00) — not near cap, ignore] headroom available, can dispatch more. (...)
 ```
 
 Exit code：0=GO、1=PACE、2=STOP、3=無資料。`--json` 給程式吃。
+輸出順序固定：判定 → 核心理由 → `[7d: …]` → 選用的補充說明。呼叫端就算
+把整行截短（例如只留 200 字），7d 那段也還在。
 
-為什麼要腳本、不直接看數字？因為 agent（跟人）常犯三個錯：
+為什麼要腳本、不直接看數字？因為 agent（跟人）常犯四個錯：
 
 1. **重置算術** — `limits.json` 只在 statusline 渲染時更新，重置後仍顯示
    舊的 90 幾 %。只要 `now > resets_at`，用量就是 ~0%，不必花 token 驗證。
 2. **7d 假警報** — 7d 視窗若在目前 5h 視窗結束「之前」就重置，再高的
    7d % 都不構成限制。判定會幫你忽略。
-3. **燒速外插** — 多 agent 突發派工下線性外插是「下限」，所以硬門檻
-   永遠優先。
+3. **看配速，不只看燒速** — *pace*＝已用 % ÷ 5h 視窗已過時間 %（小於 1
+   ＝落後進度、還有餘裕）。投影取「整個視窗的平均速率」和「近 30 分鐘趨勢
+   （只外插到取樣涵蓋的長度）」兩者較大的那個。只靠投影超標，要 pace ≥ 0.9
+   才判 PACE——落後進度時的一波突發派工只會被報告，不會被當成要減速。
+   視窗開頭 20 分鐘內，投影不會單獨觸發 PACE（開窗 1 分鐘用 1% 會「投影」
+   出 300%），只看 soft 門檻。硬門檻 STOP 一樣永遠優先。
+4. **把明天的重置看成今天** — 重置時刻跟現在同一天時印 `HH:MM`，不同天印
+   `MM-DD HH:MM`。`budget-guard.cjs` 的警告用同一套規則。
+
+`USAGE_VERDICT_NOW=<epoch 秒>` 可以固定時鐘（`usage_verdict.py` 和
+`budget-guard.cjs` 都吃）；`test_usage_verdict.py` 就是靠它（只用標準庫：
+`python3 test_usage_verdict.py`）。
+
+**只留一份正本（選用）。** `budget-guard.cjs` 叫 agent 跑的是它旁邊那支
+`usage_verdict.py`。如果你也想在共用位置呼叫判定（其他腳本、dispatcher、
+dotfiles repo），把正本裝成 `~/.claude/scripts/usage_verdict.py`，再把
+`extras/usage_verdict_shim.py` 以 `usage_verdict.py` 的檔名複製到
+`budget-guard.cjs` 旁邊（`~/.claude/hooks/<資料夾>/`）。shim 會帶著同樣的
+參數執行正本，輸出和 exit code 都一樣，要改只改正本那一份。
 
 `--ratio` 從累積的歷史資料實測你方案的 7d/5h 額度比——排多天批次工作
 時有用（兩個視窗官方是獨立的，沒有公開換算式）。

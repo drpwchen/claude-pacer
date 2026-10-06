@@ -33,12 +33,22 @@ const DEFAULTS = { soft_pct: 85, hard_pct: 93, stale_min: 15, rearm_min: 10, pac
 // silent, hard says keep working, save state, and don't launch new subagent waves (subagents do NOT
 // auto-continue — they end failed and must be resumed by the main session after the reset).
 // v0.1.6 made true the default; in real multi-session use the built-in resume never fired, hence the revert.
-// usage_verdict.py ships next to this file; macOS/Linux usually have no bare `python`
+// usage_verdict.py ships next to this file (or extras/usage_verdict_shim.py renamed to it, which
+// runs a single shared copy in ~/.claude/scripts/); macOS/Linux usually have no bare `python`
 const PY = process.platform === 'win32' ? 'python' : 'python3';
 const VERDICT_CMD = `${PY} "${path.join(__dirname, 'usage_verdict.py')}"`;
 
 function readJson(f, fallback) {
   try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return fallback; }
+}
+
+// HH:MM if the reset falls on the same local day as now, else MM-DD HH:MM — a reset
+// tomorrow must not read as today. Same rule as usage_verdict.py clock().
+function fmtClock(tsSec, nowMs) {
+  const t = new Date(tsSec * 1000), n = new Date(nowMs);
+  const p = (x) => String(x).padStart(2, '0');
+  const hm = `${p(t.getHours())}:${p(t.getMinutes())}`;
+  return t.toDateString() === n.toDateString() ? hm : `${p(t.getMonth() + 1)}-${p(t.getDate())} ${hm}`;
 }
 
 function emit(input, msg) {
@@ -52,7 +62,7 @@ function sevenDayNote(limits, fiveResets, now) {
   const sd = limits.seven_day;
   if (!sd || typeof sd.used_percentage !== 'number' || !sd.resets_at) return null;
   const pct = Math.round(sd.used_percentage);
-  const clock = new Date(sd.resets_at * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const clock = fmtClock(sd.resets_at, now);
   if (now / 1000 >= sd.resets_at) return `7d already reset — ignore`;
   if (sd.resets_at <= fiveResets) return `7d ${pct}% but resets ${clock}, before this 5h window ends — IGNORE, not a constraint`;
   if (pct >= 95) return `7d ${pct}% (resets ${clock}) — binding, near cap`;
@@ -66,7 +76,8 @@ function main() {
   const cfg = Object.assign({}, DEFAULTS, fileCfg.guard || fileCfg);
   const limits = readJson(LIMITS_FILE, null);
   if (!limits || !limits.five_hour) return;
-  const now = Date.now();
+  // test clock override (epoch seconds), shared with usage_verdict.py
+  const now = process.env.USAGE_VERDICT_NOW ? Number(process.env.USAGE_VERDICT_NOW) * 1000 : Date.now();
   if (now - limits.ts > cfg.stale_min * 60 * 1000) return; // stale data, stay silent
 
   const pct = limits.five_hour.used_percentage;
@@ -81,7 +92,7 @@ function main() {
   const ss = state.sessions[sid] = state.sessions[sid] || {};
 
   const remainMin = Math.max(0, Math.round((resetsAt * 1000 - now) / 60000));
-  const resetClock = new Date(resetsAt * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const resetClock = fmtClock(resetsAt, now);
   const sdNote = sevenDayNote(limits, resetsAt, now);
 
   let level = null;
