@@ -198,12 +198,15 @@ Thresholds and intervals are in the `guard` section of `config.json`.
 
 ```
 $ python3 usage_verdict.py     # `python` on Windows
-GO — 5h at 42%, 133 min left, projected ~61% at reset — headroom available, can dispatch more. [7d: 71% — not near cap, ignore] (...)
+GO — 5h at 42%, 133 min left, behind pace (0.75 = 42% used / 56% elapsed), projected ~75% at reset. [7d: 7d 71% (resets 10-09 13:00) — not near cap, ignore] headroom available, can dispatch more. (...)
 ```
 
 Exit codes: 0 = GO, 1 = PACE, 2 = STOP, 3 = no data. `--json` for machine use.
+The line always starts with the verdict, then the core reason, then the
+`[7d: …]` note, then optional detail — so a caller that truncates the line
+(say to 200 characters) still keeps the 7d note.
 
-Why a script instead of just reading the numbers? Three mistakes agents (and
+Why a script instead of just reading the numbers? Four mistakes agents (and
 humans) make constantly:
 
 1. **Reset arithmetic** — `limits.json` only refreshes when a statusline
@@ -211,8 +214,30 @@ humans) make constantly:
    `now > resets_at`, usage is ~0%; no need to spend tokens "verifying".
 2. **7d false alarms** — a high 7d % is meaningless when the 7d window resets
    *before* the current 5h window ends. The verdict ignores it for you.
-3. **Burn projection** — linear projection from recent samples is a *lower
-   bound* under bursty multi-agent dispatch, so the hard STOP threshold rules.
+3. **Pace, not just burn** — *pace* = used % ÷ elapsed % of the 5h window
+   (below 1 = behind pace, there is headroom). The projection takes the
+   larger of the whole-window average rate and the last 30 minutes' trend
+   (extrapolated only as far as it was sampled). A projected overrun on its
+   own means PACE only when pace ≥ 0.9 — a dispatch burst while you are
+   behind pace is reported, not acted on. In the first 20 minutes of a window
+   the projection never triggers PACE by itself (1% after 1 minute would
+   "project" 300%); only the soft threshold does. The hard STOP threshold
+   rules either way.
+4. **Reading tomorrow's reset as today's** — reset times print `HH:MM` when
+   they fall on today's date and `MM-DD HH:MM` otherwise. `budget-guard.cjs`
+   uses the same rule in its warnings.
+
+`USAGE_VERDICT_NOW=<epoch seconds>` pins the clock (for both
+`usage_verdict.py` and `budget-guard.cjs`); `test_usage_verdict.py` uses it
+(stdlib only: `python3 test_usage_verdict.py`).
+
+**One shared copy (optional).** `budget-guard.cjs` tells agents to run the
+`usage_verdict.py` next to it. If you also want the verdict at a shared path
+(other scripts, a dispatcher, a dotfiles repo), install the real file as
+`~/.claude/scripts/usage_verdict.py` and copy `extras/usage_verdict_shim.py`
+next to `budget-guard.cjs` (in `~/.claude/hooks/<folder>/`) as
+`usage_verdict.py`. The shim runs the real file with the same arguments,
+output and exit code, so there is only one copy to edit.
 
 `--ratio` estimates your plan's 7d/5h cap ratio empirically from collected
 history — useful for planning multi-day batch jobs (the two windows are

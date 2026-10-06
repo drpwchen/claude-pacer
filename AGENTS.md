@@ -29,8 +29,11 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
 - **Config compatibility.** `config.json` keys are public API once released —
   add new keys with safe defaults, don't rename or repurpose existing ones.
 - **Verify with `node statusline.cjs --demo`** (all tiers, both display
-  modes) plus a synthetic-stdin render before committing. There is no test
-  suite; the demo is the smoke test.
+  modes) plus a synthetic-stdin render before committing — the demo is the
+  statusline's smoke test. `usage_verdict.py` / `budget-guard.cjs` changes
+  must also pass `python3 test_usage_verdict.py` (stdlib unittest; keep it
+  timezone-independent — build timestamps from local `datetime(...)`, never
+  from a hard-coded epoch).
 - **The 5h and 7d windows are independent.** There is no official conversion
   and none may be derived (no `7d ÷ 7`, no linear mapping, never infer one %
   from the other). `usage_verdict.py --ratio` *measures* the plan's cap ratio
@@ -68,12 +71,33 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
 
 ## Maintainer notes (the author's own deployment — other users can ignore)
 
-- This repo is the source of truth. The live copies Claude Code actually runs
-  are `~/.claude/hooks/statusline-v2/{statusline,budget-guard}.cjs` (the
-  folder name is historical; `settings.json` points there) and
-  `usage_verdict.py` duplicated to `~/.claude/scripts/`. After every release,
-  copy the three files to those locations — a release that is not synced
-  changes nothing on the author's machine.
+- **Which side is the source of truth.** This repo is upstream for the
+  *code*: every change to these files lands here first (or is back-ported
+  here before the next release). Inside `~/.claude`, the one real verdict is
+  `~/.claude/scripts/usage_verdict.py`; the copy next to the guard is only the
+  shim. `~/.claude` is itself a private git repo, so agents working there may
+  edit the live copies directly — that is how v0.1.8's pace/date changes were
+  born, and the old "copy repo → live after release" step would have silently
+  overwritten them.
+- **Sync map** (repo → live; the folder name `statusline-v2` is historical,
+  `settings.json` points there):
+
+  | repo | live |
+  |---|---|
+  | `statusline.cjs`, `budget-guard.cjs` | `~/.claude/hooks/statusline-v2/` |
+  | `extras/usage_verdict_shim.py` | `~/.claude/hooks/statusline-v2/usage_verdict.py` |
+  | `usage_verdict.py`, `test_usage_verdict.py` | `~/.claude/scripts/` |
+
+- **Release = pull live first, then push to live.**
+  1. *Before* editing for a release, diff every row of the map. If a live
+     file differs from the repo's last tag, live has unreleased work: port
+     it here (keeping it generic — no personal paths), never copy over it.
+  2. Make the release (checklist above).
+  3. Copy repo → live per the map, then run, from `~/.claude/scripts/`:
+     `PACER_TEST_GUARD_DIR=~/.claude/hooks/statusline-v2 python3 test_usage_verdict.py`
+     (`python` on Windows) — this tests the installed guard and shim in place.
+  4. A release that is not synced changes nothing on the author's machine;
+     a sync without step 1 can erase work.
 - State dir is `~/.claude/claude-pacer/` (`config.json`, `limits.json`,
   `limits-history.jsonl`, `width-last.json`, `handoff.md`). The old
   `~/.claude/statusline-v2/` state dir and `hooks/statusline-v2/bak-20260724/`
