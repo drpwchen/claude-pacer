@@ -32,6 +32,8 @@ const DEFAULTS = {
   bar_width: 6,
   width: null,         // terminal columns; null = auto-detect
   tier: 'auto',        // 'auto' | 'full' | 'compact' | 'minimal' — force a layout
+  wrap: 'auto',        // 'auto' = spill onto a second line instead of degrading | 'never' = one line
+  reserve: 4,          // columns Claude Code keeps for itself (2 indent + 2 right margin); add your statusLine.padding
 };
 function readJson(f, fb) { try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return fb; } }
 const cfg = Object.assign({}, DEFAULTS, readJson(path.join(DIR, 'config.json'), {}));
@@ -43,6 +45,9 @@ if (hasFlag('--context')) cfg.context = true;
 if (hasFlag('--no-context')) cfg.context = false;
 if (argValue('--width')) cfg.width = parseInt(argValue('--width'), 10) || null;
 if (argValue('--tier')) cfg.tier = argValue('--tier');
+if (argValue('--wrap')) cfg.wrap = argValue('--wrap');
+if (hasFlag('--no-wrap')) cfg.wrap = 'never';
+if (argValue('--reserve') !== null) { const r = parseInt(argValue('--reserve'), 10); if (r >= 0) cfg.reserve = r; }
 
 // ---------- rendering helpers ----------
 const RESET = '\x1b[0m', DIM = '\x1b[2m', BOLD = '\x1b[1m';
@@ -245,14 +250,18 @@ function persist(rl, model, now) {
 }
 
 // ---------- main ----------
-function buildLine(input, now, topic, level, topicMax) {
+// keys: which segments to include (default all) — lets render() split them
+// over two lines.
+const SEGMENTS = ['topic', '5h', '7d', 'ctx', 'model'];
+function buildLine(input, now, topic, level, topicMax, keys) {
+  keys = keys || SEGMENTS;
   const rl = input.rate_limits || {};
   const parts = [];
-  if (topic) parts.push(`${CYAN}${truncate(topic, topicMax || (level > 0 ? 10 : cfg.topic_chars))}${RESET}`);
-  parts.push(windowPart('5h', rl.five_hour, 5 * 3600 * 1000, now, level));
-  parts.push(windowPart('7d', rl.seven_day, 7 * 24 * 3600 * 1000, now, level));
-  if (cfg.context) parts.push(contextPart(input.context_window, level));
-  if (cfg.model) { const m = modelPart(input, level); if (m) parts.push(m); } // rightmost
+  if (topic && keys.includes('topic')) parts.push(`${CYAN}${truncate(topic, topicMax || (level > 0 ? 10 : cfg.topic_chars))}${RESET}`);
+  if (keys.includes('5h')) parts.push(windowPart('5h', rl.five_hour, 5 * 3600 * 1000, now, level));
+  if (keys.includes('7d')) parts.push(windowPart('7d', rl.seven_day, 7 * 24 * 3600 * 1000, now, level));
+  if (cfg.context && keys.includes('ctx')) parts.push(contextPart(input.context_window, level));
+  if (cfg.model && keys.includes('model')) { const m = modelPart(input, level); if (m) parts.push(m); } // rightmost
   return parts.join(level > 0 ? `${DIM}│${RESET}` : ` ${DIM}│${RESET} `);
 }
 
@@ -297,37 +306,69 @@ function detectWidth() {
 const TIERS = { full: 0, compact: 1, minimal: 2 };
 
 function render(input, opts) {
-  const now = Date.now();
+  const pinned = parseFloat(process.env.USAGE_VERDICT_NOW); // epoch seconds, tests only
+  const now = pinned > 0 ? Math.round(pinned * 1000) : Date.now();
   if (!opts || !opts.demo) persist(input.rate_limits || {}, input.model, now);
   const topic = cfg.topic ? ((opts && opts.demo) ? input.session_name : getTopic(input)) : null;
   if (cfg.tier in TIERS) return buildLine(input, now, topic, TIERS[cfg.tier]);
   const width = (opts && opts.width) || detectWidth();
-  // degrade gently: full → full with a shorter topic → compact → minimal
-  const steps = [
-    { level: 0, t: null }, { level: 0, t: 8 },
-    { level: 1, t: 8 }, { level: 2, t: 8 },
-  ];
-  let step = 0;
-  let line = buildLine(input, now, topic, 0, null);
-  if (width) {
-    while (step < steps.length - 1 && plainWidth(line) > width) {
-      step++;
-      line = buildLine(input, now, topic, steps[step].level, steps[step].t);
+  // Claude Code indents the row and keeps a right margin, so a line exactly
+  // $COLUMNS wide gets cut ("Opus 5.5·me…"). Fit to what is actually visible.
+  const reserve = Number.isFinite(cfg.reserve) && cfg.reserve >= 0 ? cfg.reserve : DEFAULTS.reserve;
+  const budget = width ? Math.max(1, width - reserve) : null;
+
+  // One line first, degrading only as far as a shorter topic. If even that
+  // doesn't fit and wrap is on, spill onto a second line (Ctx + model, then
+  // 7d too) instead of compacting; each line then degrades on its own.
+  let groups = [fitGroup(input, now, topic, SEGMENTS, budget)];
+  if (budget && groups[0].level > 0 && cfg.wrap !== 'never') {
+    let best = null;
+    for (const layout of WRAP_LAYOUTS) {
+      const g = layout.map(keys => fitGroup(input, now, topic, keys, budget)).filter(x => x.line);
+      if (g.length < 2) continue; // nothing to move down (ctx/model hidden)
+      const score = g.reduce((s, x) => s + x.level * 10 + x.step, 0);
+      if (!best || score < best.score) best = { g, score };
+      if (g.every(x => x.level === 0)) break;
     }
+    if (best) groups = best.g;
   }
-  const level = steps[step].level;
+  const lines = groups.map(x => x.line);
   if (!opts || !opts.demo) { // diagnostics: which width source won, which tier rendered
     try {
       fs.writeFileSync(path.join(DIR, 'width-last.json'), JSON.stringify({
-        ts: now, used: width || null, level,
+        ts: now, used: width || null, reserve, budget, level: Math.max(...groups.map(x => x.level)),
+        lines: lines.length,
         cfg_width: cfg.width || null,
         COLUMNS: process.env.COLUMNS || null,
         stdout_columns: process.stdout.columns || null,
-        line_width: plainWidth(line),
+        line_width: Math.max(...lines.map(plainWidth)),
       }));
     } catch {}
   }
-  return line;
+  return lines.join('\n');
+}
+
+// degrade gently: full → full with a shorter topic → compact → minimal
+const STEPS = [
+  { level: 0, t: null }, { level: 0, t: 8 },
+  { level: 1, t: 8 }, { level: 2, t: 8 },
+];
+// second-line candidates, in order of preference
+const WRAP_LAYOUTS = [
+  [['topic', '5h', '7d'], ['ctx', 'model']],
+  [['topic', '5h'], ['7d', 'ctx', 'model']],
+];
+
+// Render one group of segments at the richest step that fits the budget
+// (unknown budget → full, never degrade on a guess).
+function fitGroup(input, now, topic, keys, budget) {
+  let step = 0;
+  let line = buildLine(input, now, topic, STEPS[0].level, STEPS[0].t, keys);
+  while (budget && step < STEPS.length - 1 && plainWidth(line) > budget) {
+    step++;
+    line = buildLine(input, now, topic, STEPS[step].level, STEPS[step].t, keys);
+  }
+  return { line, step, level: STEPS[step].level };
 }
 
 function demo() {
@@ -346,12 +387,18 @@ function demo() {
   hot.context_window.used_percentage = 82;
   hot.rate_limits.five_hour.used_percentage = 91;
   hot.rate_limits.five_hour.resets_at = now + 0.7 * 3600;
-  for (const display of ['bar', 'number']) {
-    cfg.display = display;
-    for (const [name, width] of [['wide  ', 999], ['medium', 60], ['narrow', 40]]) {
-      console.log(`  ${display} ${name}  ${render(input, { demo: true, width })}`);
+  const wrapMode = cfg.wrap;
+  for (const wrap of ['auto', 'never']) {
+    cfg.wrap = wrap;
+    for (const display of ['bar', 'number']) {
+      cfg.display = display;
+      for (const [name, width] of [['wide  ', 999], ['medium', 60], ['narrow', 40]]) {
+        const head = `  ${display} ${name} wrap=${wrap.padEnd(5)}  `;
+        console.log(head + render(input, { demo: true, width }).split('\n').join('\n' + ' '.repeat(head.length)));
+      }
     }
   }
+  cfg.wrap = wrapMode;
   cfg.display = 'bar';
   console.log('  near cap     ' + render(hot, { demo: true, width: 999 }));
 }

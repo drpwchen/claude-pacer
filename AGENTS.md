@@ -30,7 +30,8 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
   add new keys with safe defaults, don't rename or repurpose existing ones.
 - **Verify with `node statusline.cjs --demo`** (all tiers, both display
   modes) plus a synthetic-stdin render before committing — the demo is the
-  statusline's smoke test. `usage_verdict.py` / `budget-guard.cjs` changes
+  statusline's smoke test — and `node test_statusline.cjs` (layout
+  snapshots; update a snapshot only after reading the new output). `usage_verdict.py` / `budget-guard.cjs` changes
   must also pass `python3 test_usage_verdict.py` (stdlib unittest; keep it
   timezone-independent — build timestamps from local `datetime(...)`, never
   from a hard-coded epoch).
@@ -62,6 +63,11 @@ state dir (default `~/.claude/claude-pacer/`, override `--dir` /
 - Width detection order: config `width` → `$COLUMNS` (Claude Code ≥2.1.153
   sets it) → `stdout.columns` → cached console probe. Unknown width must
   NEVER degrade the layout — full tier is the fallback.
+- Fit to `width − reserve` (default 4): Claude Code indents the row 2 and
+  keeps a 2-column right margin, so a line exactly `$COLUMNS` wide is cut
+  (v0.1.8 bug: 88 wide in 89 columns → `Opus 5.5·me…`). With `wrap: auto`,
+  the line spills to a second row (Ctx + model, then 7d) BEFORE any segment
+  is compacted; max two rows. Pinned `tier` is always one row.
 - `plainWidth()` counts CJK as 2 columns; keep it in sync with any new glyphs.
 - The elapsed-time marker `┃` is inserted BETWEEN bar cells (bar renders w+1
   wide) so the filled proportion always reads true. Never let it replace a

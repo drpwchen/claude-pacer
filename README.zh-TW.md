@@ -108,7 +108,18 @@ node statusline.cjs --demo
 fallback：stdout、再探測 console——Windows `mode con`／其他 `stty size`，
 快取 15 秒）。偵測不到寬度就**維持完整版**，絕不用猜的降級。
 config.json 的 `"width"` 可覆蓋偵測，`"tier"`（`full`／`compact`／
-`minimal`）可直接釘死版型。
+`minimal`）可直接釘死版型（一律單行）。
+
+**放不下就換行，不截斷。** 降成緊湊版之前會先換行（`"wrap": "auto"`，預設）：
+完整版連縮短主題都放不下時，`Ctx`＋模型移到第二行；第一行還是太寬，就連 `7d`
+一起移下去。兩行各自再降級，所以窄 pane 裡仍看得到完整模型名和 context 長條，
+而不是 `Opus 5.5·me…`。Claude Code 原生支援多行 statusline。
+`"wrap": "never"`（或 `--no-wrap`）回到舊的單行行為。
+
+Claude Code 會把 statusline 那一列縮排、右側也留邊，剛好 `$COLUMNS` 寬的行會被截掉。
+版面是以 `$COLUMNS` 減 `"reserve"`（預設 `4`＝左縮排 2＋右邊界 2）來排。
+Claude Code 設定裡有設 `statusLine.padding` 的話，把它加進 `reserve`；
+右側通知仍會吃掉你的行，就再調大。
 
 ## 設定
 
@@ -126,6 +137,8 @@ config.json 的 `"width"` 可覆蓋偵測，`"tier"`（`full`／`compact`／
 | `bar_width` | `6` | — | 長條寬度（字元） |
 | `width` | `null`（自動） | `--width N` | 自適應版型的終端欄寬；偵測不到＝維持完整版 |
 | `tier` | `"auto"` | `--tier T` | 釘死版型：`full`／`compact`／`minimal` |
+| `wrap` | `"auto"` | `--wrap never`／`--no-wrap` | `auto`：降級前先把 Ctx＋模型（再不夠連 7d）移到第二行；`never`：永遠單行 |
+| `reserve` | `4` | `--reserve N` | Claude Code 自己佔掉的欄數（縮排＋右邊界）；有設 `statusLine.padding` 要加上去 |
 
 state 目錄可用 `--dir <path>` 或 `$CLAUDE_PACER_DIR` 覆蓋（三支腳本通用）。
 
@@ -202,7 +215,8 @@ Exit code：0=GO、1=PACE、2=STOP、3=無資料。`--json` 給程式吃。
 
 `USAGE_VERDICT_NOW=<epoch 秒>` 可以固定時鐘（`usage_verdict.py` 和
 `budget-guard.cjs` 都吃）；`test_usage_verdict.py` 就是靠它（只用標準庫：
-`python3 test_usage_verdict.py`）。
+`python3 test_usage_verdict.py`）。statusline 版面有自己的快照測試
+（`node test_statusline.cjs`，零依賴），一樣用它固定時鐘。
 
 **只留一份正本（選用）。** `budget-guard.cjs` 叫 agent 跑的是它旁邊那支
 `usage_verdict.py`。如果你也想在共用位置呼叫判定（其他腳本、dispatcher、

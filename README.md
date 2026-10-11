@@ -120,7 +120,22 @@ the statusline process since v2.1.153 (fallbacks: `process.stdout.columns`,
 then probing the attached console — `mode con` on Windows, `stty size
 </dev/tty` elsewhere — cached 15 s). If width can't be determined the line
 stays **full** — it never degrades on a guess. `"width"` in config.json overrides detection, and
-`"tier"` (`"full"` / `"compact"` / `"minimal"`) pins a layout outright.
+`"tier"` (`"full"` / `"compact"` / `"minimal"`) pins a layout outright (always one line).
+
+**Two lines instead of truncation.** Before compacting anything, the line
+wraps (`"wrap": "auto"`, the default): if the full layout doesn't fit even
+with a shorter topic, `Ctx` + model move to a second line — and if the first
+line is still too wide, `7d` moves down with them. Each line then degrades on
+its own, so on a narrow pane you still see the full model name and context
+gauge instead of `Opus 5.5·me…`. Claude Code supports multi-line statuslines
+natively. `"wrap": "never"` (or `--no-wrap`) keeps the old one-line
+behavior.
+
+Claude Code indents the statusline row and keeps a right margin, so a line
+exactly `$COLUMNS` wide gets cut. The layout fits `$COLUMNS` minus
+`"reserve"` (default `4` = 2 indent + 2 margin). If you set
+`statusLine.padding` in Claude Code's settings, add that to `reserve`; if
+notifications on the right of the row still eat your line, raise it.
 
 ## Configuration
 
@@ -138,6 +153,8 @@ Settings live in `~/.claude/claude-pacer/config.json` (created by you; see
 | `bar_width` | `6` | — | Bar width in characters |
 | `width` | `null` (auto) | `--width N` | Terminal columns for the responsive layout; unknown = stay full |
 | `tier` | `"auto"` | `--tier T` | Pin a layout: `full` / `compact` / `minimal` |
+| `wrap` | `"auto"` | `--wrap never` / `--no-wrap` | `auto`: move Ctx + model (then 7d) to a second line before compacting; `never`: always one line |
+| `reserve` | `4` | `--reserve N` | Columns Claude Code keeps for itself (indent + right margin); add your `statusLine.padding` |
 
 State dir override (all three scripts): `--dir <path>` or `$CLAUDE_PACER_DIR`.
 
@@ -229,7 +246,9 @@ humans) make constantly:
 
 `USAGE_VERDICT_NOW=<epoch seconds>` pins the clock (for both
 `usage_verdict.py` and `budget-guard.cjs`); `test_usage_verdict.py` uses it
-(stdlib only: `python3 test_usage_verdict.py`).
+(stdlib only: `python3 test_usage_verdict.py`). The statusline layout has its
+own snapshot tests (`node test_statusline.cjs`, no dependencies), which pin the
+clock the same way.
 
 **One shared copy (optional).** `budget-guard.cjs` tells agents to run the
 `usage_verdict.py` next to it. If you also want the verdict at a shared path

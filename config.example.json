@@ -8,6 +8,8 @@
   "bar_width": 6,
   "width": null,
   "tier": "auto",
+  "wrap": "auto",
+  "reserve": 4,
   "guard": {
     "soft_pct": 85,
     "hard_pct": 93,

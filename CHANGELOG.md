@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- **The statusline wraps instead of getting cut.** When the full line doesn't
+  fit (even with a shorter topic), `Ctx` + model move to a second line, and
+  `7d` follows if the first line is still too wide; each line then degrades on
+  its own. Before, a narrow pane compacted everything or Claude Code cut the
+  tail (`… │ Opus 5.5·me…`). New config key `wrap` (`"auto"` default,
+  `"never"` = the old one-line behavior; flags `--wrap never` / `--no-wrap`).
+  Pinned `tier` stays one line.
+- **Layout fits what Claude Code actually shows.** Claude Code indents the
+  statusline row and keeps a right margin, so a line exactly `$COLUMNS` wide
+  was truncated (seen: 88 columns in an 89-column pane). The layout now fits
+  `$COLUMNS` minus the new `reserve` key (default `4`; add your
+  `statusLine.padding`; flag `--reserve N`). This also applies to a `width`
+  set in config.json — set `reserve: 0` to keep the old fit.
+- `width-last.json` also records `reserve`, `budget` and `lines`.
+- `USAGE_VERDICT_NOW` also pins the statusline's clock; new
+  `test_statusline.cjs` snapshot tests (widths 40–200, unknown width, wrap
+  never, reserve, missing data; zero dependencies: `node test_statusline.cjs`).
+- `--demo` shows both `wrap` modes.
+
 ## v0.1.8 — 2026-10-06
 
 - **`usage_verdict.py` is pace-aware.** It now reports *pace* (used % ÷
