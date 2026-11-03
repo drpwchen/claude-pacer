@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.9 — 2026-11-03 — Statusline wraps to a second line instead of getting cut
 
 - **The statusline wraps instead of getting cut.** When the full line doesn't
   fit (even with a shorter topic), `Ctx` + model move to a second line, and
