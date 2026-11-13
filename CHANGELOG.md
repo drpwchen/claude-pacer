@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.10 — 2026-11-14 — Docs: README quality pass
+
+- README: added a link to the blog post near the top, an explicit Requirements & cost note, a support line after Install, a Limitations section and a related-tools line (codex-pacer).
+- README.zh-TW: same changes, in Traditional Chinese.
+- No code changes.
+
 ## v0.1.9 — 2026-11-03 — Statusline wraps to a second line instead of getting cut
 
 - **The statusline wraps instead of getting cut.** When the full line doesn't

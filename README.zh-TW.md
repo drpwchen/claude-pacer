@@ -2,7 +2,7 @@
 
 Claude Code 用量 statusline＋額度警戒 hook＋配速判定，三件一組。
 
-[English README → README.md](README.md)
+[English README → README.md](README.md) · [緣起與使用說明（blog）](https://drpwchen.com/posts/claude-pacer/)
 
 ```
 重構auth middleware │ 5h ▓▓▓┃░░░ 42%·剩2h13m │ 7d ▓▓▓▓┃▓░ 71%·剩3d2h │ Ctx ▓▓░░░░ 34% │ Fable 5·high
@@ -47,8 +47,9 @@ statusline 則解決重度多開時的日常小摩擦：
 
 ## 安裝
 
-Windows／macOS／Linux 都能跑。需要 Node.js（statusline＋guard）；
-usage_verdict 需要 Python 3（選用）。
+**環境與成本。** Windows／macOS／Linux 都能跑。需要 Node.js（statusline＋guard）；
+usage_verdict 需要 Python 3（選用）；不需要 npm 或 pip 套件。用量數字要 Claude Code
+Pro/Max 訂閱（見下）。不需帳號、不需 API key、沒有任何網路呼叫，免費（MIT）。
 
 ```bash
 git clone https://github.com/drpwchen/claude-pacer.git
@@ -85,6 +86,10 @@ Claude Code 的 `rate_limits` statusline 資料（Pro/Max 訂閱才有；API key
 ```bash
 node statusline.cjs --demo
 ```
+
+應該會看到 statusline 在幾種寬度下，以數字與長條兩種模式各畫一次。
+
+> 🧋 省了你時間的話，[請我喝杯飲料](https://drpwchen.com/support/)。
 
 ## 怎麼讀
 
@@ -247,6 +252,19 @@ hard 警戒觸發且終端必須關閉時，Claude 寫好 `handoff.md`，排程�
 （最新視窗快照）、`limits-history.jsonl`（燒速取樣，約 2 分鐘一筆，
 256 KB 自動修剪）、`topics.json`（主題快取）、`guard-state.json`，加上
 你自己的 `config.json`／`pace.json`。完全本機，任何地方都沒有網路呼叫。
+
+## 限制
+
+- 用量數字只有 Pro/Max 訂閱才有；API key 計費沒有 5h／7d 視窗可讀。
+- guard 的反應速度取決於 statusline 的取樣（約每 2 分鐘一次）。多個 agent 同時
+  以每分鐘數 % 的速度燒額度時，可能在兩次取樣之間就撞到上限，警告來不及送達
+  （見上方 budget-guard）。
+- guard 只是注入指令，無法強制 Claude 停手；subagent 撞上限後不會自動續跑。
+- 5h 與 7d 視窗互相獨立，官方沒有公布換算方式，所以這裡不做任何推算。
+
+## 相關工具
+
+[codex-pacer](https://github.com/drpwchen/codex-pacer)——同樣的概念，給 Codex CLI 用。
 
 ## 🌱 AI agent 新手起點
 

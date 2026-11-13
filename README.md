@@ -2,7 +2,9 @@
 
 A statusline + budget guard + pacing verdict for Claude Code usage limits.
 
-[繁體中文說明 → README.zh-TW.md](README.zh-TW.md)
+[繁體中文說明 → README.zh-TW.md](README.zh-TW.md) · [Story and walkthrough (blog, zh-TW)](https://drpwchen.com/posts/claude-pacer/) · [English version of the post](https://drpwchen.com/en/posts/claude-pacer/)
+
+Try the rendering without touching your config: `node statusline.cjs --demo`.
 
 ```
 Refactor auth middleware │ 5h ▓▓▓┃░░░ 42%·2h13m │ 7d ▓▓▓▓┃▓░ 71%·3d2h │ Ctx ▓▓░░░░ 34% │ Fable 5·high
@@ -54,8 +56,10 @@ use:
 
 ## Install
 
-Works on Windows, macOS, and Linux. Requires Node.js (statusline + guard) and
-Python 3 (verdict, optional).
+**Requirements & cost.** Windows, macOS or Linux. Node.js (statusline + guard)
+and Python 3 (verdict, optional); no npm or pip packages. A Claude Code Pro/Max
+subscription for the usage numbers (see below). No accounts, no API keys, no
+network calls, free (MIT).
 
 ```bash
 git clone https://github.com/drpwchen/claude-pacer.git
@@ -92,6 +96,11 @@ Preview both display modes without touching your config:
 ```bash
 node statusline.cjs --demo
 ```
+
+You should see the statusline rendered at several widths, in both number and
+bar modes.
+
+> 🧋 Saved you some time? [Buy me a drink](https://drpwchen.com/en/support/).
 
 ## Reading the statusline
 
@@ -285,6 +294,22 @@ samples, ~2 min interval, auto-trimmed at 256 KB), `topics.json` (topic cache),
 `guard-state.json`, and your `config.json` / `pace.json`. Nothing leaves your
 machine; there are no network calls anywhere.
 
+## Limitations
+
+- Usage numbers exist only on Pro/Max subscriptions; with API-key billing there
+  are no 5h / 7d windows to read.
+- The guard is only as fast as the statusline's samples (~every 2 min). A fleet
+  burning several %/min can reach the cap between two samples before any
+  warning lands (see budget-guard above).
+- The guard injects instructions; it cannot force Claude to stop. Subagents do
+  not auto-continue after a cap.
+- The 5h and 7d windows are independent; no conversion between them is
+  published, so none is derived.
+
+## Related tools
+
+[codex-pacer](https://github.com/drpwchen/codex-pacer) — the same idea for Codex CLI.
+
 ## 🌱 Start here if you're new to AI agents
 
 This tool is one piece of my personal AI workflow. If you want to learn how to
@@ -306,5 +331,5 @@ MIT
 
 ## Support 支持
 
-覺得這個工具有幫助嗎？歡迎[請我喝飲料](https://drpwchen.com/support/) 🧋
-If this tool helped you, you can [buy me a drink](https://drpwchen.com/en/support/).
+If this tool helped you, you can [buy me a drink](https://drpwchen.com/en/support/) 🧋
+覺得這個工具有幫助嗎？歡迎[請我喝飲料](https://drpwchen.com/support/)。
